@@ -1,0 +1,22 @@
+Von: hausverwaltung@wohnpark-sued.example
+An: gebaeude@rheinland-sach.example
+Datum: 05.10.2026
+Betreff: Wasserschaden Schadennummer WS-2026-0918, Aufstellung der Positionen
+
+Sehr geehrte Frau Niemeyer,
+
+anbei die Aufstellung zum Wasserschaden vom 18.09.2026 in der Liegenschaft Am Wohnpark 3, 68163 Mannheim (Police GB-77-129044). Betroffen sind die Wohnungen der Mieter Familie Krause (EG links) und Herr Okonkwo (1. OG rechts).
+
+| Pos | Datum      | Gewerk              | Firma                    | Betrag      |
+|-----|------------|---------------------|--------------------------|-------------|
+| 1   | 19.09.2026 | Notdienst Sanitär   | Rohrfrei Bender GmbH     | 480,00 EUR  |
+| 2   | 22.09.2026 | Trocknung           | Trocknungstechnik Mayer  | 1.290,00 EUR|
+| 3   | 29.09.2026 | Maler, Wohnung Krause | Malerbetrieb Lutz      | 2.110,00 EUR|
+| 4   | 01.10.2026 | Maler, Wohnung Okonkwo | Malerbetrieb Lutz     | 1.760,00 EUR|
+
+Gesamt: 5.640,00 EUR
+
+Der Verursacher ist vermutlich ein defekter Spülkasten in der Wohnung von Frau Dagmar Krause. Für Rückfragen steht Ihnen unser Objektbetreuer Herr Rainer Scholz unter 0152 288 173 86 oder r.scholz@wohnpark-sued.example zur Verfügung.
+
+Mit freundlichen Grüßen
+Hausverwaltung Wohnpark Süd
