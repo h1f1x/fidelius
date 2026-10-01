@@ -1,0 +1,6 @@
+# Kopie als .envrc anlegen (ist in .gitignore). Alle Werte sind unkritische Defaults.
+export APP_PORT=8080          # Port der Web-UI auf dem Host
+export LAYA_PORT=8000         # Port des Laya-Servers (nur innerhalb des Compose-Netzes)
+export OMP_NUM_THREADS=4      # CPU-Threads je Container, nicht über die Docker-CPU-Zahl
+export GATE_THRESHOLD=0.5     # Standard-Schwellwert für die Laya-Gesamtbewertung
+export LAYA_REJECT_THRESHOLD=0.9  # ab dieser Wahrscheinlichkeit für "nicht sensibel" lehnt Laya einen Treffer ab
