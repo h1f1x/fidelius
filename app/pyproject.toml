@@ -1,0 +1,25 @@
+[project]
+name = "pii-app"
+version = "0.1.0"
+description = "Lokale Anonymisierung von E-Mails vor dem Prompting: GLiNER2-PII + spaCy + Regex, bestätigt durch Laya"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "httpx>=0.27",
+    "pydantic>=2.7",
+    "gliner2[local]==2.0.0",
+    "transformers==4.51.3",
+    "sentencepiece>=0.2",
+    "protobuf>=4",
+    "spacy>=3.8,<3.9",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
