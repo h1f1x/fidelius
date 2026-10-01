@@ -1,0 +1,16 @@
+Von: team-analytics@intern.example
+An: team-analytics@intern.example
+Betreff: Sprint-Review verschieben?
+
+Hallo zusammen,
+
+das Sprint-Review am Donnerstag kollidiert mit dem Workshop. Vorschlag: wir schieben es auf Freitagvormittag und machen danach direkt die Retro.
+
+Agenda bleibt wie gehabt:
+- Demo des neuen Dashboards
+- Offene Punkte aus dem Backlog
+- Planung des nächsten Sprints
+
+Wer nicht kann, bitte kurz im Kanal melden. Raum ist wie immer der große Besprechungsraum im dritten Stock.
+
+Danke und bis dann

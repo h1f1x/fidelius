@@ -1,0 +1,116 @@
+{
+  "01_schadenmeldung_kfz": {
+    "must": [
+      {"text": "Katharina Lindemann", "category": "PERSON"},
+      {"text": "Markus Pietsch", "category": "PERSON"},
+      {"text": "k.lindemann@web-mail.example", "category": "EMAIL"},
+      {"text": "KH-2023-448812", "category": "KENNUNG"},
+      {"text": "HH-KL 2231", "category": "KENNUNG"},
+      {"text": "WVWZZZ1KZ9W123456", "category": "KENNUNG"},
+      {"text": "12.09.2026", "category": "DATUM"},
+      {"text": "Pinneberg", "category": "ORT"},
+      {"text": "Dorotheenstraße 45", "category": "ADRESSE"},
+      {"text": "22301", "category": "ADRESSE"},
+      {"text": "Hamburg", "category": "ORT"},
+      {"text": "040 / 66 96 91 23", "category": "TELEFON"},
+      {"text": "+49 171 3920017", "category": "TELEFON"},
+      {"text": "Autohaus Brehmer GmbH", "category": "ORG"},
+      {"text": "2026/0912/HH-7781", "category": "KENNUNG"}
+    ],
+    "keep": ["Auffahrunfall", "Kostenvoranschlag", "Reparatur"]
+  },
+  "02_vertragsaenderung_iban": {
+    "must": [
+      {"text": "Jonas Brettschneider", "category": "PERSON"},
+      {"text": "Özdemir", "category": "PERSON"},
+      {"text": "7733-108-55", "category": "KENNUNG"},
+      {"text": "LV 4471 2290 03", "category": "KENNUNG"},
+      {"text": "DE02 1203 0000 0000 2020 51", "category": "IBAN"},
+      {"text": "DE89 3704 0044 0532 0130 00", "category": "IBAN"},
+      {"text": "Severinstraße 118", "category": "ADRESSE"},
+      {"text": "Köln", "category": "ORT"},
+      {"text": "86 095 742 719", "category": "KENNUNG"},
+      {"text": "0221 4710382", "category": "TELEFON"},
+      {"text": "01.11.2026", "category": "DATUM"}
+    ],
+    "keep": ["Lebensversicherung", "Bankverbindung"]
+  },
+  "03_bewerbung": {
+    "must": [
+      {"text": "Leonie Hartwig", "category": "PERSON"},
+      {"text": "Falkenberg", "category": "PERSON"},
+      {"text": "23.04.1996", "category": "DATUM"},
+      {"text": "Leipzig", "category": "ORT"},
+      {"text": "Bautzner Straße 72", "category": "ADRESSE"},
+      {"text": "Dresden", "category": "ORT"},
+      {"text": "0176 04 06 90 41", "category": "TELEFON"},
+      {"text": "leonie.hartwig@posteo-test.example", "category": "EMAIL"},
+      {"text": "DA-2026-17", "category": "KENNUNG"}
+    ],
+    "keep": ["Data Analyst", "Wirtschaftsinformatik", "Controlling", "Lebenslauf"]
+  },
+  "04_terminabsprache_harmlos": {
+    "must": [],
+    "keep": ["Sprint-Review", "Workshop", "Retro", "Dashboards", "Backlog", "Besprechungsraum"]
+  },
+  "05_mehrdeutigkeiten": {
+    "must": [
+      {"text": "Sabine Berlin", "category": "PERSON"},
+      {"text": "Hahn", "category": "PERSON"},
+      {"text": "Peter Frankfurt", "category": "PERSON"},
+      {"text": "Andreas Berlin", "category": "PERSON"},
+      {"text": "Müller Gruppe", "category": "ORG"},
+      {"text": "Bergmannstraße 9", "category": "ADRESSE"},
+      {"text": "0043-117", "category": "KENNUNG"},
+      {"text": "+49 172 992 59 04", "category": "TELEFON"}
+    ],
+    "keep": ["Lieferverträge", "Haftungsklausel", "Großküchen", "Zulieferern", "kartellrechtlich"]
+  },
+  "06_mailkette_varianten": {
+    "must": [
+      {"text": "Thorsten Wiegand", "category": "PERSON"},
+      {"text": "Annika Reuter", "category": "PERSON"},
+      {"text": "Emre Yilmaz", "category": "PERSON"},
+      {"text": "Sandra Kolbe", "category": "PERSON"},
+      {"text": "Wiegand", "category": "PERSON"},
+      {"text": "Yilmaz", "category": "PERSON"},
+      {"text": "Reuter", "category": "PERSON"},
+      {"text": "SN-2026-004471", "category": "KENNUNG"},
+      {"text": "0174 / 90 91 31 7", "category": "TELEFON"},
+      {"text": "09.10.2026", "category": "DATUM"},
+      {"text": "Kiel", "category": "ORT"}
+    ],
+    "keep": ["Gutachten", "Regulierung", "Mandant", "Klage"]
+  },
+  "07_schadenaufstellung_tabelle": {
+    "must": [
+      {"text": "WS-2026-0918", "category": "KENNUNG"},
+      {"text": "GB-77-129044", "category": "KENNUNG"},
+      {"text": "Niemeyer", "category": "PERSON"},
+      {"text": "Am Wohnpark 3", "category": "ADRESSE"},
+      {"text": "Mannheim", "category": "ORT"},
+      {"text": "Krause", "category": "PERSON"},
+      {"text": "Okonkwo", "category": "PERSON"},
+      {"text": "Dagmar Krause", "category": "PERSON"},
+      {"text": "Rainer Scholz", "category": "PERSON"},
+      {"text": "0152 288 173 86", "category": "TELEFON"},
+      {"text": "r.scholz@wohnpark-sued.example", "category": "EMAIL"},
+      {"text": "18.09.2026", "category": "DATUM"}
+    ],
+    "keep": ["Notdienst Sanitär", "Trocknung", "Spülkasten", "Gesamt"]
+  },
+  "08_mischtext_englisch": {
+    "must": [
+      {"text": "Priya Raghunathan", "category": "PERSON"},
+      {"text": "Felix Ebersberger", "category": "PERSON"},
+      {"text": "Daniel Okafor", "category": "PERSON"},
+      {"text": "Stefan Lorenz", "category": "PERSON"},
+      {"text": "RV-2027-HA-03", "category": "KENNUNG"},
+      {"text": "Maximilianstraße 35", "category": "ADRESSE"},
+      {"text": "München", "category": "ORT"},
+      {"text": "s.lorenz@globalre-test.example", "category": "EMAIL"},
+      {"text": "+49 89 99 99 82 71", "category": "TELEFON"}
+    ],
+    "keep": ["Treaty renewal", "underwriter", "Prämie"]
+  }
+}
