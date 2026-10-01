@@ -1,0 +1,50 @@
+services:
+  laya:
+    build:
+      context: ./laya
+      args:
+        TORCH_VERSION: "${LAYA_TORCH_VERSION:-2.14.0}"
+    environment:
+      LAYA_HOST: "0.0.0.0"
+      LAYA_PORT: "${LAYA_PORT:-8000}"
+      LAYA_DEVICE: "cpu"
+      LAYA_PRELOAD: "1"
+      LAYA_MODELS: "multilingual"
+      LAYA_MAX_LOADED: "1"
+      LAYA_THREADS: "${OMP_NUM_THREADS:-4}"
+      OMP_NUM_THREADS: "${OMP_NUM_THREADS:-4}"
+      LAYA_LOG_LEVEL: "info"
+      HF_HUB_OFFLINE: "${HF_HUB_OFFLINE:-0}"
+    volumes:
+      - laya-model-cache:/home/laya/.cache/huggingface
+    init: true
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os, urllib.request; urllib.request.urlopen('http://127.0.0.1:' + os.environ['LAYA_PORT'] + '/health', timeout=4)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15m
+      start_interval: 3s
+
+  app:
+    build:
+      context: ./app
+    environment:
+      LAYA_URL: "http://laya:${LAYA_PORT:-8000}"
+      GATE_THRESHOLD: "${GATE_THRESHOLD:-0.5}"
+      LAYA_REJECT_THRESHOLD: "${LAYA_REJECT_THRESHOLD:-0.9}"
+      OMP_NUM_THREADS: "${OMP_NUM_THREADS:-4}"
+      HF_HUB_OFFLINE: "1"
+    ports:
+      - "127.0.0.1:${APP_PORT:-8080}:8080"
+    volumes:
+      - ./examples:/opt/examples:ro
+    depends_on:
+      laya:
+        condition: service_healthy
+    init: true
+    restart: unless-stopped
+
+volumes:
+  laya-model-cache:
