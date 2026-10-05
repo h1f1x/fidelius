@@ -8,8 +8,8 @@ auf dem die App läuft.
 ## Was passiert mit einem Text
 
 1. **Laya bewertet** den ganzen Text: Enthält er personenbezogene Daten? Drei Fragen, der Höchstwert
-   über alle Absätze zählt. Unter dem Schwellwert (Standard 0,5) endet der Lauf; „Trotzdem erkennen“
-   überspringt das Gate.
+   über alle Absätze zählt. Unter dem Schwellwert (Standard 0,5) endet der Lauf; „Trotzdem
+   anonymisieren“ überspringt das Gate.
 2. **Drei Erkenner finden Treffer**, parallel:
    - GLiNER2-PII (`fastino/gliner2-privacy-filter-PII-multi`), mehrsprachig, 42 PII-Labels
    - spaCy `de_core_news_lg` für Personen, Orte, Organisationen
