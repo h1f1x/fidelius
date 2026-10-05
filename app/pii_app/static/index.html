@@ -16,9 +16,9 @@
 </header>
 
 <div id="info" class="infobox hidden">
-  <p><strong>Was passiert:</strong> Du fügst eine E-Mail ein. Die App prüft, ob darin Namen, Adressen, Telefonnummern, Kundennummern, Bankdaten oder Ähnliches vorkommen, und ersetzt diese Stellen durch Platzhalter wie <code>[PERSON_1]</code>. Den anonymisierten Text kopierst du in ChatGPT oder eine andere KI. Die Antwort fügst du in Schritt 3 wieder ein, und die Platzhalter werden gegen die echten Namen zurückgetauscht.</p>
+  <p><strong>Was passiert:</strong> Du fügst einen Text ein. Die App prüft, ob darin Namen, Adressen, Telefonnummern, Kundennummern, Bankdaten oder Ähnliches vorkommen, und ersetzt diese Stellen durch Platzhalter wie <code>[PERSON_1]</code>. Den anonymisierten Text kopierst du in ChatGPT oder eine andere KI. Die Antwort fügst du in Schritt 3 wieder ein, und die Platzhalter werden gegen die echten Namen zurückgetauscht.</p>
   <p><strong>Was bleibt wo:</strong> Alles läuft auf diesem Rechner. Der Text wird an keinen Dienst im Internet geschickt. Die Tabelle, welcher Platzhalter wofür steht, liegt nur in deinem Browser.</p>
-  <p><strong>Womit:</strong> Drei Erkenner suchen Treffer: GLiNER2-PII (ein mehrsprachiges Modell für personenbezogene Daten), spaCy (deutsches Sprachmodell für Namen, Orte, Firmen) und feste Muster für E-Mail, Telefon, IBAN, Datum und Kennungen. Das Modell Laya bewertet vorab, ob die Mail überhaupt sensible Inhalte enthält, und bestätigt danach jeden einzelnen Treffer im Satzzusammenhang.</p>
+  <p><strong>Womit:</strong> Drei Erkenner suchen Treffer: GLiNER2-PII (ein mehrsprachiges Modell für personenbezogene Daten), spaCy (deutsches Sprachmodell für Namen, Orte, Firmen) und feste Muster für E-Mail-Adresse, Telefon, IBAN, Datum und Kennungen. Das Modell Laya bewertet vorab, ob der Text überhaupt sensible Inhalte enthält, und bestätigt danach jeden einzelnen Treffer im Satzzusammenhang.</p>
   <p><strong>Wenn etwas falsch erkannt wird:</strong> Klick auf die markierte Stelle. Dort kannst du den Treffer ablehnen (dann bleibt das Wort stehen) oder die Art ändern. Die Änderung gilt für alle Vorkommen desselben Werts.</p>
   <p><strong>Expertenmodus:</strong> zeigt an jedem Treffer, welcher Erkenner ihn gefunden hat (G = GLiNER2-PII, S = spaCy, R = Muster, L✓/L✗ = Laya hat bestätigt/abgelehnt), dazu Laufzeiten und zwei Einstellungen: ab welcher Einschätzung automatisch anonymisiert wird und ob Laya jeden Treffer bestätigen soll.</p>
 </div>
@@ -28,13 +28,13 @@
 <!-- Drei Schritte untereinander: Erledigte klappen zu einer Zeile zusammen, der aktive ist offen. -->
 <main class="flow">
   <div class="stage">
-    <button class="stagehead"><span class="num">1</span><span class="ttl">E-Mail einfügen</span><span class="sum"></span><span class="chev"></span></button>
+    <button class="stagehead"><span class="num">1</span><span class="ttl">Text einfügen</span><span class="sum"></span><span class="chev"></span></button>
     <section class="col input">
       <div class="row between">
-        <p class="hint">E-Mail hier einfügen oder unten ein Beispiel wählen.</p>
+        <p class="hint">Text hier einfügen oder unten ein Beispiel wählen.</p>
         <button id="clear" class="ghost small">Leeren</button>
       </div>
-      <textarea id="text" placeholder="E-Mail hier einfügen …" spellcheck="false"></textarea>
+      <textarea id="text" placeholder="Text hier einfügen …" spellcheck="false"></textarea>
       <div class="row">
         <label for="example">Beispiel <span class="muted">(wird oben eingefügt)</span></label>
         <select id="example"><option value="">– bitte wählen –</option></select>
