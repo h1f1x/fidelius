@@ -30,6 +30,12 @@ services:
   app:
     build:
       context: ./app
+      # Setzen make up und scripts/deploy.sh über scripts/build-info.sh; leer heißt unbekannt.
+      args:
+        BUILD_NUMBER: "${BUILD_NUMBER:-}"
+        BUILD_COMMIT: "${BUILD_COMMIT:-}"
+        BUILD_DIRTY: "${BUILD_DIRTY:-}"
+        BUILD_TIME: "${BUILD_TIME:-}"
     environment:
       LAYA_URL: "http://laya:${LAYA_PORT:-8000}"
       GATE_THRESHOLD: "${GATE_THRESHOLD:-0.5}"

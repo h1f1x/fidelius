@@ -31,6 +31,8 @@ Compose v2. Der ssh-Benutzer muss Docker ohne `sudo` nutzen dürfen (Gruppe `doc
    Variablen aus `.envrc.example` setzen (ohne `export`).
 3. `docker compose up --build -d --wait` baut und startet beide Container und kommt zurück, wenn
    beide gesund sind. Der erste Start lädt den Laya-Checkpoint und kann einige Minuten dauern.
+   Den Git-Stand bekommt das App-Image als Build-Args mit; die Fußzeile der UI zeigt Version,
+   Build-Nummer und Commit, auch ob nicht committete Änderungen dabei waren.
 
 ## Zugang
 

@@ -9,7 +9,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import config
+from . import build_info, config
 from .detectors import gliner, spacy_det
 from .models import AnalyzeRequest, AnalyzeResponse, ApplyRequest, ApplyResponse
 from .pipeline import Pipeline
@@ -17,7 +17,7 @@ from .pipeline import Pipeline
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger(__name__)
 
-app = FastAPI(title="PII-Anonymisierung vor dem Prompting", version="0.1.0")
+app = FastAPI(title="PII-Anonymisierung vor dem Prompting", version=build_info.version())
 pipeline = Pipeline()
 STATIC = Path(__file__).parent / "static"
 
@@ -67,6 +67,7 @@ def get_config() -> dict:
         "gate_threshold": config.GATE_THRESHOLD,
         "laya_reject_threshold": config.LAYA_REJECT_THRESHOLD,
         "laya_checked_categories": sorted(config.LAYA_CHECKED_CATEGORIES),
+        "build": build_info.build(),
     }
 
 

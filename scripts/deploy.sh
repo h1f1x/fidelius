@@ -34,4 +34,7 @@ remote "command -v rsync >/dev/null || { echo 'rsync fehlt auf der VM.'; exit 1;
 # die .env auf der VM stehen, während --delete alles andere auf den lokalen Stand bringt.
 rsync -az --delete --exclude=.git --exclude-from=.gitignore -e "$ssh_cmd" ./ "$DEPLOY_HOST:$remote_dir/"
 
-remote "bash -s -- $remote_dir $(printf '%q ' "$WAIT_TIMEOUT" "$DEPLOY_BIND")" < scripts/remote-deploy.sh
+# Auf der VM fehlt .git, deshalb kommt der Build-Stand von hier. Die Werte enthalten keine
+# Leerzeichen oder Sonderzeichen und gehen unverändert durch die Remote-Shell.
+build_env=$(scripts/build-info.sh | tr '\n' ' ')
+remote "env $build_env bash -s -- $remote_dir $(printf '%q ' "$WAIT_TIMEOUT" "$DEPLOY_BIND")" < scripts/remote-deploy.sh
