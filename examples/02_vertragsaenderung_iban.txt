@@ -1,5 +1,5 @@
 Von: Jonas Brettschneider <jonas.brettschneider@gmx-test.example>
-An: kundenservice@rheinland-leben.example
+An: kundenservice@musterleben-versicherung.example
 Datum: Mo, 21. September 2026 14:03
 Betreff: Änderung der Bankverbindung, Kundennummer 7733-108-55
 

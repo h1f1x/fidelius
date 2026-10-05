@@ -1,5 +1,5 @@
 Von: hausverwaltung@wohnpark-sued.example
-An: gebaeude@rheinland-sach.example
+An: gebaeude@mustersach-versicherung.example
 Datum: 05.10.2026
 Betreff: Wasserschaden Schadennummer WS-2026-0918, Aufstellung der Positionen
 

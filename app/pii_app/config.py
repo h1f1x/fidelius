@@ -97,3 +97,7 @@ DATE_STOPWORDS = {
 }
 
 EXAMPLES_DIR = os.environ.get("EXAMPLES_DIR", "/opt/examples")
+
+# Obergrenze je Anfrage. Eine lange Mailkette hat einige tausend Zeichen; ohne Grenze hält ein
+# einzelner Request mit Megabytes an Text die CPU minutenlang fest.
+MAX_TEXT_CHARS = int(os.environ.get("MAX_TEXT_CHARS", "50000"))

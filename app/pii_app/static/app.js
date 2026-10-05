@@ -21,7 +21,7 @@
   function load() { try { const s = JSON.parse(localStorage.getItem(STORAGE_KEY)); if (s && s.text) state = s; } catch {} }
   async function api(path, body) {
     const r = await fetch(path, body ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : {});
-    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.statusText);
+    if (!r.ok) throw Object.assign(new Error((await r.json().catch(() => ({}))).detail || r.statusText), { status: r.status });
     return r.json();
   }
 
@@ -66,7 +66,11 @@
       state = { text: res.text, entities: res.entities, mapping: res.mapping, anonymized: res.anonymized_text, gate: res.gate, timing: res.timing };
       save(); render();
       showError(null);
-    } catch (e) { showError("Die Prüfung ist fehlgeschlagen: " + e.message + ". Bitte noch einmal versuchen."); }
+    } catch (e) {
+      // Zu langer Text: Wiederholen hilft nicht, nur Kürzen.
+      showError(e.status === 413 ? e.message + ". Bitte den Text kürzen."
+        : "Die Prüfung ist fehlgeschlagen: " + e.message + ". Bitte noch einmal versuchen.");
+    }
     finally { $("run").disabled = false; $("force").disabled = false; $("busy").classList.add("hidden"); }
   }
   async function reapply() {

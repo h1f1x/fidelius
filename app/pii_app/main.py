@@ -78,15 +78,24 @@ def get_example(name: str) -> dict:
     return {"name": p.stem, "text": p.read_text(encoding="utf-8")}
 
 
+def _check_length(text: str) -> None:
+    if len(text) > config.MAX_TEXT_CHARS:
+        def de(n: int) -> str:
+            return f"{n:,}".replace(",", ".")
+        raise HTTPException(413, f"Der Text ist zu lang ({de(len(text))} Zeichen, höchstens {de(config.MAX_TEXT_CHARS)})")
+
+
 @app.post("/api/analyze", response_model=AnalyzeResponse)
 def analyze(req: AnalyzeRequest) -> AnalyzeResponse:
     if not req.text.strip():
         raise HTTPException(400, "Leerer Text")
+    _check_length(req.text)
     return pipeline.analyze(req)
 
 
 @app.post("/api/apply", response_model=ApplyResponse)
 def apply(req: ApplyRequest) -> ApplyResponse:
+    _check_length(req.text)
     entities, anonymized, mapping = pipeline.apply(req.text, req.entities)
     return ApplyResponse(entities=entities, anonymized_text=anonymized, mapping=mapping)
 

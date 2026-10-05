@@ -34,10 +34,13 @@ services:
       LAYA_URL: "http://laya:${LAYA_PORT:-8000}"
       GATE_THRESHOLD: "${GATE_THRESHOLD:-0.5}"
       LAYA_REJECT_THRESHOLD: "${LAYA_REJECT_THRESHOLD:-0.9}"
+      LAYA_RECAT_THRESHOLD: "${LAYA_RECAT_THRESHOLD:-0.95}"
+      GLINER_THRESHOLD: "${GLINER_THRESHOLD:-0.5}"
+      MAX_TEXT_CHARS: "${MAX_TEXT_CHARS:-50000}"
       OMP_NUM_THREADS: "${OMP_NUM_THREADS:-4}"
       HF_HUB_OFFLINE: "1"
     ports:
-      - "127.0.0.1:${APP_PORT:-8080}:8080"
+      - "${APP_BIND:-127.0.0.1}:${APP_PORT:-8080}:8080"
     volumes:
       - ./examples:/opt/examples:ro
     depends_on:
@@ -45,6 +48,13 @@ services:
         condition: service_healthy
     init: true
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/api/health', timeout=4)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 2m
+      start_interval: 2s
 
 volumes:
   laya-model-cache:
