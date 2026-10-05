@@ -44,7 +44,10 @@ Request-Bodys über 2 MB und mehr als 2000 Stellen auf einmal.
 
 ## Auf der VM nachsehen
 
+`make remote-login` öffnet eine Shell auf der VM im Deploy-Verzeichnis, mit denselben Variablen
+wie `make deploy`. Dort dann:
+
 ```bash
-ssh user@vm 'cd fidelius && docker compose ps'
-ssh user@vm 'cd fidelius && docker compose logs -f'
+docker compose ps
+docker compose logs -f
 ```

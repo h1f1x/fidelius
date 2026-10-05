@@ -16,12 +16,12 @@ WAIT_TIMEOUT ?= 1800
 # Die Unit-Tests brauchen keine Modelle, deshalb nur diese Pakete statt aller Abhängigkeiten.
 TEST_DEPS := --with pydantic --with httpx --with fastapi --with pytest
 
-.PHONY: help init up down logs status test examples deploy \
+.PHONY: help init up down logs status test examples deploy remote-login \
         _tools-Darwin _tools-Linux _runtime-Darwin _runtime-Linux _start-Darwin _start-Linux \
         _compose _memory
 
 help: ## Diese Übersicht
-	@grep -E '^[a-z][a-z-]*:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-10s %s\n", $$1, $$2}'
+	@grep -E '^[a-z][a-z-]*:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-13s %s\n", $$1, $$2}'
 
 init: _tools-$(OS) _runtime-$(OS) _compose _memory ## Tools prüfen und fehlende installieren, Runtime starten
 	@echo "Fertig. Weiter mit: make up"
@@ -49,6 +49,13 @@ examples: ## Beispielmails gegen die laufende App prüfen, z. B. make examples A
 
 deploy: ## Arbeitsstand per rsync auf die VM bringen und starten, z. B. make deploy DEPLOY_HOST=user@vm
 	scripts/deploy.sh
+
+# Gleiche Variablen wie scripts/deploy.sh. Vor dem ersten Deploy gibt es das Verzeichnis noch
+# nicht, dann landet die Shell im Home.
+remote-login: ## Shell auf der VM im Deploy-Verzeichnis öffnen
+	@: "$${DEPLOY_HOST:?DEPLOY_HOST fehlt, siehe docs/deployen.md}"
+	ssh -t $${DEPLOY_JUMP:+-J "$$DEPLOY_JUMP"} "$$DEPLOY_HOST" \
+	  "cd \"$${DEPLOY_DIR:-fidelius}\" 2>/dev/null; exec \"\$$SHELL\" -l"
 
 # --- macOS ------------------------------------------------------------------------------
 
