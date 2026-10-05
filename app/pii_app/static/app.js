@@ -7,15 +7,17 @@
   const EXPERT_KEY = "pii-app-expert";
 
   let CONFIG = { categories: {} };
-  const emptyState = () => ({ text: "", entities: [], mapping: [], anonymized: "", gate: null, timing: null });
+  const emptyState = () => ({ text: "", entities: [], mapping: [], anonymized: "", gate: null, timing: null, elapsed_ms: null });
   let state = emptyState();
   let lastInputWasPaste = false;
+  let clock = null;
 
   // ---------- Hilfen ----------
   const esc = (s) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const color = (cat) => (CONFIG.categories[cat] || {}).color || "#999";
   const label = (cat) => (CONFIG.categories[cat] || {}).label || cat;
   function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.remove("hidden"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.add("hidden"), 1800); }
+  const secs = (ms) => (ms / 1000).toLocaleString("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " s";
   function showError(msg) { const e = $("error"); if (!msg) { e.classList.add("hidden"); return; } e.textContent = msg; e.classList.remove("hidden"); }
   async function copy(text, msg) { try { await navigator.clipboard.writeText(text); toast(msg); } catch { toast("Kopieren nicht möglich, bitte Text manuell markieren."); } }
   function save() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {} }
@@ -63,10 +65,12 @@
     if (!text.trim()) { toast("Bitte zuerst eine E-Mail einfügen."); return; }
     // Ein altes Ergebnis passt nicht zum neuen Lauf; es verschwindet sofort, nicht erst mit der Antwort.
     clearResult();
-    $("run").disabled = true; $("force").disabled = true; $("busy").classList.remove("hidden");
+    $("run").disabled = true; $("force").disabled = true;
+    const t0 = performance.now(), tick = () => { $("elapsed").textContent = "Prüfe … " + secs(performance.now() - t0); };
+    clearInterval(clock); tick(); clock = setInterval(tick, 100);
     try {
       const res = await api("/api/analyze", { text, gate_threshold: Number($("threshold").value), force, use_laya_check: $("layaCheck").checked });
-      state = { text: res.text, entities: res.entities, mapping: res.mapping, anonymized: res.anonymized_text, gate: res.gate, timing: res.timing };
+      state = { text: res.text, entities: res.entities, mapping: res.mapping, anonymized: res.anonymized_text, gate: res.gate, timing: res.timing, elapsed_ms: Math.round(performance.now() - t0) };
       save(); render();
       showError(null);
     } catch (e) {
@@ -74,7 +78,7 @@
       showError(e.status === 413 ? e.message + ". Bitte den Text kürzen."
         : "Die Prüfung ist fehlgeschlagen: " + e.message + ". Bitte noch einmal versuchen.");
     }
-    finally { $("run").disabled = false; $("force").disabled = false; $("busy").classList.add("hidden"); }
+    finally { clearInterval(clock); $("run").disabled = false; $("force").disabled = false; renderElapsed(); }
   }
   async function reapply() {
     try {
@@ -91,8 +95,10 @@
   }
 
   // ---------- Darstellung ----------
+  // Gemessen im Browser: die Wartezeit inklusive Netzwerk, nicht nur die Rechenzeit des Servers.
+  function renderElapsed() { $("elapsed").textContent = state.elapsed_ms != null ? "Geprüft in " + secs(state.elapsed_ms) : ""; }
   function render() {
-    renderGate(); renderResult(); renderMapping();
+    renderGate(); renderResult(); renderMapping(); renderElapsed();
     const t = state.timing;
     $("timing").textContent = t ? `Einschätzung ${t.gate_ms} ms · Erkennung ${t.detect_ms} ms · Laya-Bestätigung ${t.laya_check_ms} ms · gesamt ${t.total_ms} ms` : "";
   }
