@@ -1,19 +1,19 @@
 # Sensible Inhalte für ChatGPT ersetzen
 
-Kleine Web-App, die E-Mails anonymisiert, bevor man sie in ChatGPT, Claude oder einen anderen
+Kleine Web-App, die Texte anonymisiert, bevor man sie in ChatGPT, Claude oder einen anderen
 KI-Dienst einfügt, und die Antwort anschließend wieder zurückübersetzt. Alle Modelle laufen in den
-eigenen Containern: Die Mail geht an keinen externen Dienst, sie bleibt auf dem Rechner oder Server,
+eigenen Containern: Der Text geht an keinen externen Dienst, er bleibt auf dem Rechner oder Server,
 auf dem die App läuft.
 
-## Was passiert mit einer Mail
+## Was passiert mit einem Text
 
-1. **Laya bewertet** die ganze Mail: Enthält sie personenbezogene Daten? Drei Fragen, der Höchstwert
+1. **Laya bewertet** den ganzen Text: Enthält er personenbezogene Daten? Drei Fragen, der Höchstwert
    über alle Absätze zählt. Unter dem Schwellwert (Standard 0,5) endet der Lauf; „Trotzdem erkennen“
    überspringt das Gate.
 2. **Drei Erkenner finden Treffer**, parallel:
    - GLiNER2-PII (`fastino/gliner2-privacy-filter-PII-multi`), mehrsprachig, 42 PII-Labels
    - spaCy `de_core_news_lg` für Personen, Orte, Organisationen
-   - Regex für E-Mail, Telefon, IBAN (mit Prüfsumme), Datum, Straße mit Hausnummer, Kennungen
+   - Regex für E-Mail-Adresse, Telefon, IBAN (mit Prüfsumme), Datum, Straße mit Hausnummer, Kennungen
      hinter Schlüsselwörtern (Versicherungsschein-Nr., Kundennummer, Aktenzeichen …), Steuer-ID,
      Sozialversicherungsnummer, Kfz-Kennzeichen
 3. **Zusammenführen**: Überlappende Treffer werden vereint. Regex-Spans gewinnen, sonst der längste
@@ -66,7 +66,7 @@ und sagt in seiner Kopfzeile, was als Nächstes zu tun ist. Ein erledigter Schri
 Zeile mit Zusammenfassung zusammen und lässt sich per Klick wieder aufklappen. Noch nicht
 erreichte Schritte zeigen „wartet“.
 
-1. **E-Mail einfügen.** Eingefügter Text wird sofort geprüft, getippter Text nach Klick auf
+1. **Text einfügen.** Eingefügter Text wird sofort geprüft, getippter Text nach Klick auf
    „Anonymisieren“ (auch Cmd/Ctrl+Enter). Unter dem Feld lässt sich ein Beispiel wählen. Die
    Einschätzung zeigt ein rot-grüner Balken mit Wortstufe („sehr unwahrscheinlich“ bis „sehr
    sicher“). Ab „wahrscheinlich“ wird direkt anonymisiert, und Schritt 2 öffnet sich. Sonst bleibt
@@ -104,7 +104,7 @@ make examples ARGS="-q 05"   # nur Abgleich, nur Beispiel 05
 
 Das Skript zeigt je Mail den Gate-Wert, jeden Treffer mit Quellen und Laya-Urteil und dann
 `FEHLT` (zu schwach), `ZU VIEL` (zu stark) und `EXTRA` (ersetzt, aber nicht in der Soll-Liste).
-Eigene Mails: als `.txt` nach `examples/` legen, Soll-Treffer in `expected.json` ergänzen.
+Eigene Texte: als `.txt` nach `examples/` legen, Soll-Treffer in `expected.json` ergänzen.
 
 Unit-Tests ohne Modelle (Regex, Zusammenführen, Platzhalter, Rückübersetzung):
 
@@ -133,7 +133,7 @@ Kategorien, Farben, Label-Zuordnungen und die Laya-Fragen stehen in `app/pii_app
 - Firmennamen mit Nachnamen („Malerbetrieb Lutz“) werden teils als Person erkannt. Für die
   Anonymisierung ist das unschädlich, der Platzhalter ist nur anders benannt.
 - Reine Jahreszahlen und Wochentage bleiben stehen, Beträge ebenfalls.
-- Laufzeit auf CPU: 5 bis 12 Sekunden je Mail, davon der größte Teil die Laya-Bestätigung
+- Laufzeit auf CPU: 5 bis 12 Sekunden je Text, davon der größte Teil die Laya-Bestätigung
   (rund 0,2 s je Treffer). Ohne Bestätigung (Häkchen in der UI) rund 2 bis 5 Sekunden.
 
 ## Lizenzen der Modelle

@@ -71,7 +71,7 @@
   // ---------- Analyse ----------
   async function run(force) {
     const text = $("text").value;
-    if (!text.trim()) { toast("Bitte zuerst eine E-Mail einfügen."); return; }
+    if (!text.trim()) { toast("Bitte zuerst einen Text einfügen."); return; }
     // Ein altes Ergebnis passt nicht zum neuen Lauf; es verschwindet sofort, nicht erst mit der Antwort.
     clearResult();
     $("run").disabled = true; $("force").disabled = true;
@@ -209,7 +209,7 @@
   function stepHint(st) {
     if (st.notSensitive) return "Laut Einschätzung steht nichts Sensibles drin. Du kannst den Text so verwenden oder trotzdem anonymisieren.";
     return [
-      "Füge die E-Mail ein. Eingefügter Text wird sofort geprüft.",
+      "Füge den Text ein. Eingefügter Text wird sofort geprüft.",
       "Prüf die Markierungen, dann kopiere den anonymisierten Text und füge ihn in ChatGPT ein.",
       "Füge die Antwort der KI ein und klick auf „Rückübersetzen“.",
       "Fertig. Die rückübersetzte Antwort kannst du jetzt kopieren.",
