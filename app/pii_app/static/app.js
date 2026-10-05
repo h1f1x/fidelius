@@ -7,7 +7,7 @@
   const EXPERT_KEY = "pii-app-expert";
 
   let CONFIG = { categories: {} };
-  const emptyState = () => ({ text: "", entities: [], mapping: [], anonymized: "", gate: null, timing: null, elapsed_ms: null });
+  const emptyState = () => ({ text: "", entities: [], mapping: [], anonymized: "", gate: null, timing: null, elapsed_ms: null, copied: false });
   let state = emptyState();
   let lastInputWasPaste = false;
   let clock = null;
@@ -19,7 +19,7 @@
   function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.remove("hidden"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.add("hidden"), 1800); }
   const secs = (ms) => (ms / 1000).toLocaleString("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " s";
   function showError(msg) { const e = $("error"); if (!msg) { e.classList.add("hidden"); return; } e.textContent = msg; e.classList.remove("hidden"); }
-  async function copy(text, msg) { try { await navigator.clipboard.writeText(text); toast(msg); } catch { toast("Kopieren nicht möglich, bitte Text manuell markieren."); } }
+  async function copy(text, msg) { try { await navigator.clipboard.writeText(text); toast(msg); return true; } catch { toast("Kopieren nicht möglich, bitte Text manuell markieren."); return false; } }
   function save() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {} }
   function load() { try { const s = JSON.parse(localStorage.getItem(STORAGE_KEY)); if (s && s.text) state = s; } catch {} }
   async function api(path, body) {
@@ -30,6 +30,7 @@
 
   // ---------- Initialisierung ----------
   async function init() {
+    renderSteps();
     setExpert(localStorage.getItem(EXPERT_KEY) === "1");
     try {
       CONFIG = await api("/api/config");
@@ -46,6 +47,7 @@
     checkHealth();
     load();
     if (state.text) { $("text").value = state.text; render(); }
+    stepsReady = true;
   }
   async function checkHealth() {
     try {
@@ -108,6 +110,7 @@
     renderGate(); renderResult(); renderMapping(); renderElapsed();
     const t = state.timing;
     $("timing").textContent = t ? `Einschätzung ${t.gate_ms} ms · Erkennung ${t.detect_ms} ms · Laya-Bestätigung ${t.laya_check_ms} ms · gesamt ${t.total_ms} ms` : "";
+    renderSteps();
   }
   function gateWord(p) {
     if (p < 0.1) return "sehr unwahrscheinlich";
@@ -187,6 +190,56 @@
     const tb = $("mapping").querySelector("tbody");
     tb.innerHTML = state.mapping.map((m) => `<tr class="cat" style="--c:${color(m.category)}"><td class="ph" style="--c:${color(m.category)}">${esc(m.placeholder)}</td><td>${esc(m.original)}${m.variants.map((v) => `<span class="variant">auch: ${esc(v)}</span>`).join("")}</td><td class="src expert-only">${m.sources.length ? m.sources.map((s) => s === "laya" ? "L" : SOURCE_BADGE[s] || s).join(" ") : "M"}</td></tr>`).join("")
       || '<tr><td colspan="3" class="hint">Noch keine Ersetzungen.</td></tr>';
+  }
+
+  // ---------- Schritte: einfügen → kopieren → zurückübersetzen ----------
+  const STAGES = [...document.querySelectorAll(".stage")];
+  let stageOpen = [true, false, false], prevDone = [false, false, false], prevActive = null;
+  let stepsReady = false;  // beim Laden nicht scrollen, nur bei Schritten, die jemand gerade macht
+
+  function stepStatus() {
+    const g = state.gate;
+    const done1 = !!g && (g.sensitive || g.skipped);
+    // Kopieren per Strg+C sieht die App nicht; eine eingefügte Antwort zeigt es ebenso.
+    const done2 = done1 && (state.copied || $("reply").value.trim() !== "");
+    const done3 = done2 && $("restored").value.trim() !== "";
+    const done = [done1, done2, done3], first = done.indexOf(false);
+    return { done, active: first < 0 ? 3 : first, notSensitive: !!g && !done1 };
+  }
+  function stepHint(st) {
+    if (st.notSensitive) return "Laut Einschätzung steht nichts Sensibles drin. Du kannst den Text so verwenden oder trotzdem anonymisieren.";
+    return [
+      "Füge die E-Mail ein. Eingefügter Text wird sofort geprüft.",
+      "Prüf die Markierungen, dann kopiere den anonymisierten Text und füge ihn in ChatGPT ein.",
+      "Füge die Antwort der KI ein und klick auf „Rückübersetzen“.",
+      "Fertig. Die rückübersetzte Antwort kannst du jetzt kopieren.",
+    ][st.active];
+  }
+  function stepSummary(i, st) {
+    if (i === 0) return st.notSensitive ? "nichts Sensibles gefunden"
+      : `${state.text.length.toLocaleString("de-DE")} Zeichen · ${state.mapping.length} Ersetzungen`;
+    if (i === 1) return state.copied ? "kopiert" : "Antwort liegt vor";
+    return $("restoreInfo").textContent;
+  }
+  function renderSteps() {
+    const st = stepStatus();
+    if (st.done.every((d) => !d)) stageOpen = [true, false, false];
+    // Der letzte Schritt bleibt offen: Dort liegt die Antwort, die man noch kopieren will.
+    st.done.forEach((d, i) => { if (d && !prevDone[i] && i < 2) stageOpen[i] = false; });
+    // Wer aktiv wird, klappt auf, auch wenn er vorher schon erledigt und zugeklappt war.
+    if (st.active !== prevActive && st.active < 3) {
+      stageOpen[st.active] = true;
+      if (stepsReady) setTimeout(() => STAGES[st.active].scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+    }
+    prevDone = st.done; prevActive = st.active;
+    STAGES.forEach((s, i) => {
+      const cls = st.done[i] ? "done" : i === st.active ? "active" : "todo", waiting = cls === "todo";
+      s.className = "stage " + cls + (stageOpen[i] && !waiting ? "" : " closed");
+      s.querySelector(".num").textContent = st.done[i] ? "✓" : String(i + 1);
+      s.querySelector(".sum").textContent = waiting ? "wartet" : i === st.active ? stepHint(st) : st.done[i] ? stepSummary(i, st) : "";
+      s.querySelector(".chev").textContent = waiting ? "" : stageOpen[i] ? "▾" : "▸";
+      s.querySelector(".stagehead").disabled = waiting;
+    });
   }
 
   // ---------- Treffer bearbeiten ----------
@@ -319,7 +372,9 @@
   // ---------- Events ----------
   $("run").onclick = () => run(false);
   $("force").onclick = () => run(true);
-  $("clear").onclick = () => { $("text").value = ""; $("example").value = ""; clearResult(); };
+  // „Von vorne beginnen“ in Schritt 3 macht dasselbe wie „Leeren“ und führt zurück zu Schritt 1.
+  $("clear").onclick = $("restart").onclick = () => { $("text").value = ""; $("example").value = ""; clearResult(); $("text").focus({ preventScroll: true }); };
+  STAGES.forEach((s, i) => { s.querySelector(".stagehead").onclick = () => { stageOpen[i] = !stageOpen[i]; renderSteps(); }; });
   $("threshold").oninput = (e) => { $("thresholdValue").textContent = Number(e.target.value).toFixed(2); };
   $("expertMode").onchange = (e) => setExpert(e.target.checked);
   $("infoToggle").onclick = (e) => { e.preventDefault(); $("info").classList.toggle("hidden"); };
@@ -342,10 +397,15 @@
     if (span && span.error) toast(span.error); else if (span) openSelectionPopover(span);
   }, 0));
   document.addEventListener("click", (e) => { if (!e.target.closest("#popover") && !e.target.closest("mark.ent")) closePopover(); });
-  document.addEventListener("click", (e) => { if (e.target.closest("#copyAnon")) copy(state.anonymized || "", "Anonymisierter Text kopiert. Er enthält keine Markierungen und keine Originale."); });
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest("#copyAnon")) return;
+    copy(state.anonymized || "", "Anonymisierter Text kopiert. Er enthält keine Markierungen und keine Originale.")
+      .then((ok) => { if (ok && state.anonymized) { state.copied = true; save(); renderSteps(); } });
+  });
   $("exportMap").onclick = exportMapping;
   $("importMap").onchange = (e) => { if (e.target.files[0]) importMapping(e.target.files[0]); e.target.value = ""; };
-  $("restore").onclick = () => { const r = deanonymize($("reply").value, state.mapping); $("restored").value = r.text; $("restoreInfo").textContent = `${r.hits} Platzhalter ersetzt.`; };
+  $("restore").onclick = () => { const r = deanonymize($("reply").value, state.mapping); $("restored").value = r.text; $("restoreInfo").textContent = `${r.hits} Platzhalter ersetzt.`; renderSteps(); };
+  $("reply").addEventListener("input", renderSteps);
   $("copyRestored").onclick = () => copy($("restored").value, "Rückübersetzte Antwort kopiert.");
 
   init();

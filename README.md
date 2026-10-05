@@ -61,16 +61,29 @@ Authentifizierung legen. Die App selbst hat keinen Login. Auf eine VM mit ssh-Zu
 Die Oberfläche ist für Nutzer ohne technisches Vorwissen gedacht. Ein Klick auf „Wie funktioniert
 das?“ klappt eine Erklärung auf; Fehler erscheinen als rote Box, sonst wird nichts angezeigt.
 
-- Links: E-Mail einfügen. Eingefügter Text wird sofort geprüft, getippter Text nach Klick auf
-  „Anonymisieren“ (auch Cmd/Ctrl+Enter). Unter dem Feld lässt sich ein Beispiel wählen.
-- Einschätzung: ein rot-grüner Balken mit Wortstufe („sehr unwahrscheinlich“ bis „sehr sicher“).
-  Ab „wahrscheinlich“ wird direkt anonymisiert, sonst steht ein Knopf „Trotzdem anonymisieren“ da.
-- Rechts: „Anonymisierter Text“ mit zwei Reitern: „mit Markierungen“ (Original durchgestrichen,
-  Platzhalter farbig dahinter) und „so wie er kopiert wird“. Der Kopierknopf liefert immer nur den
-  anonymisierten Text. Klick auf eine Stelle öffnet ein Popup: Art als farbige Chips wählen oder
-  den Schalter „Wird ersetzt“ auf „Bleibt stehen“ stellen. Die Änderung gilt für alle Vorkommen
-  desselben Werts. Darunter die Zuordnungstabelle mit Export/Import.
-- Unten: KI-Antwort einfügen, „Rückübersetzen“, Ergebnis kopieren.
+Die drei Schritte stehen untereinander, verbunden durch eine Linie. Der aktive Schritt ist offen
+und sagt in seiner Kopfzeile, was als Nächstes zu tun ist. Ein erledigter Schritt klappt zu einer
+Zeile mit Zusammenfassung zusammen und lässt sich per Klick wieder aufklappen. Noch nicht
+erreichte Schritte zeigen „wartet“.
+
+1. **E-Mail einfügen.** Eingefügter Text wird sofort geprüft, getippter Text nach Klick auf
+   „Anonymisieren“ (auch Cmd/Ctrl+Enter). Unter dem Feld lässt sich ein Beispiel wählen. Die
+   Einschätzung zeigt ein rot-grüner Balken mit Wortstufe („sehr unwahrscheinlich“ bis „sehr
+   sicher“). Ab „wahrscheinlich“ wird direkt anonymisiert, und Schritt 2 öffnet sich. Sonst bleibt
+   Schritt 1 offen und bietet „Trotzdem anonymisieren“ an.
+2. **Prüfen und in die KI kopieren.** „Anonymisierter Text“ mit zwei Reitern: „mit Markierungen“
+   (Original durchgestrichen, Platzhalter farbig dahinter) und „so wie er kopiert wird“. Der
+   Kopierknopf liefert immer nur den anonymisierten Text. Klick auf eine Stelle öffnet ein Popup:
+   Art als farbige Chips wählen oder den Schalter „Wird ersetzt“ auf „Bleibt stehen“ stellen. Die
+   Änderung gilt für alle Vorkommen desselben Werts. Darunter die Zuordnungstabelle mit
+   Export/Import. Erledigt ist der Schritt, sobald der Kopierknopf erfolgreich kopiert hat oder in
+   Schritt 3 eine Antwort steht.
+3. **Antwort zurückübersetzen.** KI-Antwort einfügen, „Rückübersetzen“, Ergebnis kopieren. Dieser
+   Schritt bleibt auch erledigt offen. „Von vorne beginnen“ leert wie „Leeren“ in Schritt 1 Text,
+   Ergebnis, Tabelle und Antwort und springt zurück zu Schritt 1. Wer die Tabelle später noch
+   braucht, exportiert sie vorher.
+
+Jede Änderung am Text in Schritt 1 verwirft das alte Ergebnis, die Schritte beginnen dann von vorn.
 
 **Expertenmodus** (Schalter oben rechts, wird im Browser gemerkt) zeigt zusätzlich an jedem Treffer
 die Quellen (**G** GLiNER2-PII, **S** spaCy, **R** Regex, **L✓/L✗** Laya-Urteil), die Spalte
