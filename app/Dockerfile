@@ -13,6 +13,11 @@ RUN pip install \
       "gliner2[local]==2.0.0" "transformers==4.51.3" "sentencepiece>=0.2" "protobuf>=4" "spacy>=3.8,<3.9" \
     && python -m spacy download de_core_news_lg \
     && pip check
+# Ab hier ohne root: Die Gewichte landen im Cache des App-Users, und die App läuft als dieser User.
+RUN groupadd --gid 10001 app \
+    && useradd --uid 10001 --gid app --create-home app \
+    && mkdir -p "$HF_HOME" && chown app:app "$HF_HOME"
+USER app
 # GLiNER2-PII einmal laden, damit die Gewichte im Image liegen.
 RUN python -c "from gliner2 import GLiNER2; GLiNER2.from_pretrained('fastino/gliner2-privacy-filter-PII-multi')"
 COPY pii_app ./pii_app

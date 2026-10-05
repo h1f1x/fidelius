@@ -1,7 +1,9 @@
 # Sensible Inhalte für ChatGPT ersetzen
 
-Kleine Web-App, die E-Mails lokal anonymisiert, bevor man sie in ChatGPT, Claude oder einen anderen
-KI-Dienst einfügt, und die Antwort anschließend wieder zurückübersetzt. Nichts verlässt den Rechner.
+Kleine Web-App, die E-Mails anonymisiert, bevor man sie in ChatGPT, Claude oder einen anderen
+KI-Dienst einfügt, und die Antwort anschließend wieder zurückübersetzt. Alle Modelle laufen in den
+eigenen Containern: Die Mail geht an keinen externen Dienst, sie bleibt auf dem Rechner oder Server,
+auf dem die App läuft.
 
 ## Was passiert mit einer Mail
 
@@ -31,13 +33,16 @@ Platzhalter wie `PERSON_1`, `[Person 1]` oder `**[PERSON_1]**`.
 
 ## Starten
 
-Voraussetzung: Docker mit Compose v2, rund 8 GB RAM für Docker und 10 GB freier Plattenplatz.
+Voraussetzung: rund 8 GB RAM für Docker und 10 GB freier Plattenplatz. Einrichtung für macOS und
+Windows (WSL2) mit allen Details: [docs/lokal-aufsetzen.md](docs/lokal-aufsetzen.md).
 
 ```bash
-cp .envrc.example .envrc        # optional, Ports und Schwellwerte
-docker compose up --build -d    # erster Build lädt alle Modelle, dauert einige Minuten
+make init    # Tools prüfen und installieren, ohne Docker-Runtime kommt Colima dazu
+make up      # erster Build lädt alle Modelle, dauert einige Minuten
 open http://localhost:8080
 ```
+
+Ports und Schwellwerte lassen sich über `.envrc` setzen (Vorlage `.envrc.example`).
 
 Der Laya-Container lädt seinen Checkpoint beim ersten Start in ein Docker-Volume, die App hat
 GLiNER2-PII und spaCy bereits im Image. Danach läuft alles ohne Internet (`HF_HUB_OFFLINE=1`).
@@ -48,7 +53,8 @@ GLiNER2-PII und spaCy bereits im Image. Danach läuft alles ohne Internet (`HF_H
 | `laya` | 8000 (nur im Compose-Netz) | Laya-Server, multilingualer Checkpoint |
 
 Für Cloud oder On-Premise: beide Images bauen, `app` hinter einen Reverse-Proxy mit TLS und
-Authentifizierung legen. Die App selbst hat keinen Login.
+Authentifizierung legen. Die App selbst hat keinen Login. Auf eine VM mit ssh-Zugang deployt
+`make deploy DEPLOY_HOST=user@vm`, siehe [docs/deployen.md](docs/deployen.md).
 
 ## Bedienung
 
@@ -79,8 +85,8 @@ Namensvarianten, Schadenaufstellung als Tabelle, deutsch-englischer Mischtext) u
 `expected.json` je Mail die Soll-Treffer (`must`) und Wörter, die stehen bleiben müssen (`keep`).
 
 ```bash
-python3 scripts/run_examples.py        # alle Beispiele, volle Trefferliste
-python3 scripts/run_examples.py -q 05  # nur Abgleich, nur Beispiel 05
+make examples                # alle Beispiele, volle Trefferliste
+make examples ARGS="-q 05"   # nur Abgleich, nur Beispiel 05
 ```
 
 Das Skript zeigt je Mail den Gate-Wert, jeden Treffer mit Quellen und Laya-Urteil und dann
@@ -90,8 +96,7 @@ Eigene Mails: als `.txt` nach `examples/` legen, Soll-Treffer in `expected.json`
 Unit-Tests ohne Modelle (Regex, Zusammenführen, Platzhalter, Rückübersetzung):
 
 ```bash
-cd app && uv venv --python 3.12 .venv && uv pip install --python .venv/bin/python pydantic httpx fastapi pytest
-.venv/bin/python -m pytest -q
+make test
 ```
 
 ## Stellschrauben
@@ -103,6 +108,7 @@ cd app && uv venv --python 3.12 .venv && uv pip install --python .venv/bin/pytho
 | `LAYA_RECAT_THRESHOLD` | 0.95 | Sicherheit, ab der Laya einen spaCy-Treffer umkategorisieren darf |
 | `GLINER_THRESHOLD` | 0.5 | Mindest-Score für GLiNER2-PII-Treffer |
 | `OMP_NUM_THREADS` | 4 | CPU-Threads je Container |
+| `MAX_TEXT_CHARS` | 50000 | Höchstlänge eines Textes je Anfrage, längere lehnt die App ab |
 
 Kategorien, Farben, Label-Zuordnungen und die Laya-Fragen stehen in `app/pii_app/config.py`.
 
