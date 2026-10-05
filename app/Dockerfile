@@ -21,5 +21,9 @@ USER app
 # GLiNER2-PII einmal laden, damit die Gewichte im Image liegen.
 RUN python -c "from gliner2 import GLiNER2; GLiNER2.from_pretrained('fastino/gliner2-privacy-filter-PII-multi')"
 COPY pii_app ./pii_app
+# Build-Stand für die UI, von scripts/build-info.sh. Steht zuletzt, weil BUILD_TIME sich bei jedem
+# Build ändert und sonst den Cache aller Layer darunter verwerfen würde.
+ARG BUILD_NUMBER= BUILD_COMMIT= BUILD_DIRTY= BUILD_TIME=
+ENV BUILD_NUMBER=$BUILD_NUMBER BUILD_COMMIT=$BUILD_COMMIT BUILD_DIRTY=$BUILD_DIRTY BUILD_TIME=$BUILD_TIME
 EXPOSE 8080
 CMD ["uvicorn", "pii_app.main:app", "--host", "0.0.0.0", "--port", "8080"]

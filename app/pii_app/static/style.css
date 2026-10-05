@@ -76,6 +76,7 @@ td .variant { display: block; color: var(--muted); font-size: 11px; }
 td .src { font-size: 10px; letter-spacing: 1px; }
 tr.cat { border-left: 4px solid var(--c); }
 
+footer { margin: -8px 20px 20px; color: var(--muted); font-size: 12px; }
 .back { margin: 0 20px 20px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
 .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 @media (max-width: 800px) { .two { grid-template-columns: 1fr; } }

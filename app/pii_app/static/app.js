@@ -37,6 +37,7 @@
       showError("Die App ist gerade nicht erreichbar. Bitte prüfen, ob die Docker-Container laufen, und die Seite neu laden.");
       return;
     }
+    renderVersion(CONFIG.build);
     $("threshold").value = CONFIG.gate_threshold; $("thresholdValue").textContent = Number(CONFIG.gate_threshold).toFixed(2);
     try {
       const ex = await api("/api/examples");
@@ -52,6 +53,12 @@
       if (!(h.laya && h.laya.status === "ok")) showError("Das Bewertungsmodell (Laya) ist nicht erreichbar. Die Erkennung funktioniert trotzdem, nur die Vorab-Einschätzung fehlt.");
       else showError(null);
     } catch { showError("Die App ist gerade nicht erreichbar. Bitte prüfen, ob die Docker-Container laufen, und die Seite neu laden."); }
+  }
+  // Damit sich nachvollziehen lässt, welcher Stand läuft, gerade nach einem Deploy.
+  function renderVersion(b) {
+    const build = b.commit ? `Build ${b.number} (${b.commit}${b.dirty ? " mit nicht committeten Änderungen" : ""})` : "Build unbekannt";
+    const when = b.time ? " · gebaut " + new Date(b.time).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" }) : "";
+    $("version").textContent = `v${b.version} · ${build}${when}`;
   }
   function setExpert(on) {
     document.body.classList.toggle("expert", on);
