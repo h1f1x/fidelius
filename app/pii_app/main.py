@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import config
@@ -35,6 +35,19 @@ async def no_cache(request: Request, call_next):
     response = await call_next(request)
     response.headers["Cache-Control"] = "no-cache"
     return response
+
+
+@app.middleware("http")
+async def limit_body(request: Request, call_next):
+    """Zu große Anfragen ablehnen, bevor der Body gelesen wird. Ohne Content-Length (chunked)
+    ließe sich die Grenze umgehen, deshalb muss ein POST ihn mitschicken; fetch tut das immer."""
+    if request.method == "POST":
+        length = request.headers.get("content-length")
+        if length is None or not length.isdigit():
+            return JSONResponse({"detail": "Content-Length fehlt"}, status_code=411)
+        if int(length) > config.MAX_BODY_BYTES:
+            return JSONResponse({"detail": "Die Anfrage ist zu groß"}, status_code=413)
+    return await call_next(request)
 
 
 @app.get("/api/health")
@@ -96,6 +109,8 @@ def analyze(req: AnalyzeRequest) -> AnalyzeResponse:
 @app.post("/api/apply", response_model=ApplyResponse)
 def apply(req: ApplyRequest) -> ApplyResponse:
     _check_length(req.text)
+    if len(req.entities) > config.MAX_ENTITIES:
+        raise HTTPException(413, f"Zu viele Stellen ({len(req.entities)}, höchstens {config.MAX_ENTITIES})")
     entities, anonymized, mapping = pipeline.apply(req.text, req.entities)
     return ApplyResponse(entities=entities, anonymized_text=anonymized, mapping=mapping)
 

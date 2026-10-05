@@ -101,3 +101,7 @@ EXAMPLES_DIR = os.environ.get("EXAMPLES_DIR", "/opt/examples")
 # Obergrenze je Anfrage. Eine lange Mailkette hat einige tausend Zeichen; ohne Grenze hält ein
 # einzelner Request mit Megabytes an Text die CPU minutenlang fest.
 MAX_TEXT_CHARS = int(os.environ.get("MAX_TEXT_CHARS", "50000"))
+# Die Textgrenze greift erst nach dem Parsen. Die Body-Grenze greift vorher, die Entity-Grenze
+# deckt /api/apply ab, wo eine lange Trefferliste trotz kurzem Text Rechenzeit kostet.
+MAX_BODY_BYTES = 2_000_000
+MAX_ENTITIES = 2000
