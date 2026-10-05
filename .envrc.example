@@ -7,3 +7,5 @@ export LAYA_REJECT_THRESHOLD=0.9  # ab dieser Wahrscheinlichkeit für "nicht sen
 
 # Deployment (make deploy), siehe docs/deployen.md
 # export DEPLOY_HOST=user@vm  # ssh-Ziel, user@host oder Alias aus ~/.ssh/config
+# export DEPLOY_JUMP=user@jumphost  # optional, Jumphost wie bei ssh -J
+# export DEPLOY_BIND=10.0.0.5  # Adresse, auf der die App auf der VM lauscht; 0.0.0.0 nur hinter Firewall
