@@ -7,7 +7,8 @@
   const EXPERT_KEY = "pii-app-expert";
 
   let CONFIG = { categories: {} };
-  let state = { text: "", entities: [], mapping: [], anonymized: "", gate: null, timing: null };
+  const emptyState = () => ({ text: "", entities: [], mapping: [], anonymized: "", gate: null, timing: null });
+  let state = emptyState();
   let lastInputWasPaste = false;
 
   // ---------- Hilfen ----------
@@ -60,6 +61,8 @@
   async function run(force) {
     const text = $("text").value;
     if (!text.trim()) { toast("Bitte zuerst eine E-Mail einfügen."); return; }
+    // Ein altes Ergebnis passt nicht zum neuen Lauf; es verschwindet sofort, nicht erst mit der Antwort.
+    clearResult();
     $("run").disabled = true; $("force").disabled = true; $("busy").classList.remove("hidden");
     try {
       const res = await api("/api/analyze", { text, gate_threshold: Number($("threshold").value), force, use_laya_check: $("layaCheck").checked });
@@ -79,6 +82,12 @@
       state.entities = res.entities; state.mapping = res.mapping; state.anonymized = res.anonymized_text;
       save(); render();
     } catch (e) { showError("Die Änderung konnte nicht übernommen werden: " + e.message); }
+  }
+
+  // Antwort und Rückübersetzung gehören zum alten Ergebnis und gehen mit ihm.
+  function clearResult() {
+    $("reply").value = ""; $("restored").value = ""; $("restoreInfo").textContent = "";
+    state = emptyState(); save(); render();
   }
 
   // ---------- Darstellung ----------
@@ -297,10 +306,7 @@
   // ---------- Events ----------
   $("run").onclick = () => run(false);
   $("force").onclick = () => run(true);
-  $("clear").onclick = () => {
-    $("text").value = ""; $("example").value = ""; $("reply").value = ""; $("restored").value = ""; $("restoreInfo").textContent = "";
-    state = { text: "", entities: [], mapping: [], anonymized: "", gate: null, timing: null }; save(); render();
-  };
+  $("clear").onclick = () => { $("text").value = ""; $("example").value = ""; clearResult(); };
   $("threshold").oninput = (e) => { $("thresholdValue").textContent = Number(e.target.value).toFixed(2); };
   $("expertMode").onchange = (e) => setExpert(e.target.checked);
   $("infoToggle").onclick = (e) => { e.preventDefault(); $("info").classList.toggle("hidden"); };
@@ -309,9 +315,12 @@
     try { const ex = await api("/api/examples/" + encodeURIComponent(e.target.value)); $("text").value = ex.text; run(false); }
     catch (err) { showError("Das Beispiel konnte nicht geladen werden: " + err.message); }
   };
-  // Eingefügter Text wird sofort geprüft; getippter Text erst auf Knopfdruck.
+  // Eingefügter Text wird sofort geprüft; getippter Text erst auf Knopfdruck. Jede Änderung verwirft das alte Ergebnis.
   $("text").addEventListener("paste", () => { lastInputWasPaste = true; });
-  $("text").addEventListener("input", () => { if (lastInputWasPaste) { lastInputWasPaste = false; run(false); } });
+  $("text").addEventListener("input", () => {
+    if (state.text || $("reply").value || $("restored").value) clearResult();
+    if (lastInputWasPaste) { lastInputWasPaste = false; run(false); }
+  });
   $("text").addEventListener("keydown", (e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") run(false); });
   $("resultArea").addEventListener("click", (e) => { const m = e.target.closest("mark.ent"); if (m && getSelection().isCollapsed) openPopover(m); });
   // Auswahl erst nach dem Klick-Event auswerten, sonst schließt der Dokument-Klick das Popup sofort.
