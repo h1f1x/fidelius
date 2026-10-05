@@ -115,3 +115,4 @@ mark.ent.chip s { text-decoration: line-through; color: var(--text); font-weight
 .switch.on i { background: #1b8a3c; } .switch.on i::after { left: 16px; }
 .switch.off { color: #7a4a00; } .switch.off i { background: #e0a030; }
 
+.popover .allocc { font-size: 12px; display: flex; gap: 6px; align-items: center; }

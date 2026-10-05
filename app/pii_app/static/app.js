@@ -123,12 +123,14 @@
   let viewMode = "annot";  // "annot": Original durchgestrichen + Platzhalter; "plain": so wie kopiert
 
   function tokens(text, ents, mode) {
+    // Freie Textstücke tragen ihren Offset im Original, damit sich eine Markierung zurückrechnen lässt.
     let html = "", pos = 0;
+    const plain = (a, b) => a < b ? `<span data-o="${a}">${esc(text.slice(a, b))}</span>` : "";
     for (const e of ents) {
       if (e.start < pos) continue;
-      html += esc(text.slice(pos, e.start));
+      html += plain(pos, e.start);
       const rejected = e.status === "rejected_laya" || e.status === "rejected_user";
-      const badges = groupSources(e.sources).map((g) => `<b title="${esc(g.title)}">${SOURCE_BADGE[g.name] || "?"}</b>`).join("");
+      const badges = groupSources(e.sources).map((g) => `<b title="${esc(g.title)}">${SOURCE_BADGE[g.name] || "?"}</b>`).join("") + (e.sources.length ? "" : '<b title="manuell markiert">M</b>');
       const laya = e.laya ? `<span class="${e.laya.accepted ? "ok" : "no"}" title="Laya: ${esc(e.laya.category)} ${(e.laya.probability * 100).toFixed(0)}%">L${e.laya.accepted ? "✓" : "✗"}</span>` : "";
       const bd = `<span class="badges expert-only">${badges}${laya}</span>`;
       const st = `style="--c:${color(e.category)}" data-id="${e.id}"`;
@@ -141,7 +143,7 @@
       }
       pos = e.end;
     }
-    return html + esc(text.slice(pos));
+    return html + plain(pos, text.length);
   }
 
   function renderResult() {
@@ -157,7 +159,7 @@
 
   function renderMapping() {
     const tb = $("mapping").querySelector("tbody");
-    tb.innerHTML = state.mapping.map((m) => `<tr class="cat" style="--c:${color(m.category)}"><td class="ph" style="--c:${color(m.category)}">${esc(m.placeholder)}</td><td>${esc(m.original)}${m.variants.map((v) => `<span class="variant">auch: ${esc(v)}</span>`).join("")}</td><td class="src expert-only">${m.sources.map((s) => s === "laya" ? "L" : SOURCE_BADGE[s] || s).join(" ")}</td></tr>`).join("")
+    tb.innerHTML = state.mapping.map((m) => `<tr class="cat" style="--c:${color(m.category)}"><td class="ph" style="--c:${color(m.category)}">${esc(m.placeholder)}</td><td>${esc(m.original)}${m.variants.map((v) => `<span class="variant">auch: ${esc(v)}</span>`).join("")}</td><td class="src expert-only">${m.sources.length ? m.sources.map((s) => s === "laya" ? "L" : SOURCE_BADGE[s] || s).join(" ") : "M"}</td></tr>`).join("")
       || '<tr><td colspan="3" class="hint">Noch keine Ersetzungen.</td></tr>';
   }
 
@@ -182,19 +184,87 @@
       <div class="meta expert-only">${esc(srcs)}<br>${esc(laya)}</div>
       <div class="chips">${chips}</div>
       <button id="popToggle" class="switch ${rejected ? "off" : "on"}"><i></i>${rejected ? "Bleibt stehen, nicht ersetzen" : "Wird ersetzt"}</button>`;
-    pop.classList.remove("hidden");
-    const r = mark.getBoundingClientRect();
-    const w = pop.offsetWidth || 300;
-    pop.style.left = Math.max(10, Math.min(window.scrollX + r.left, window.scrollX + window.innerWidth - w - 10)) + "px";
-    pop.style.top = window.scrollY + r.bottom + 6 + "px";
+    showPopover(pop, mark.getBoundingClientRect());
     // Änderungen gelten für alle Vorkommen desselben Werts.
     pop.querySelectorAll(".catchip").forEach((b) => { b.onclick = () => { for (const x of same) { x.category = b.dataset.cat; x.status = "manual"; } closePopover(); reapply(); }; });
-    $("popToggle").onclick = () => { for (const x of same) x.status = rejected ? "manual" : "rejected_user"; closePopover(); reapply(); };
+    // Manuell markierte Stellen verschwinden beim Abwählen ganz, statt ausgegraut stehen zu bleiben.
+    $("popToggle").onclick = () => {
+      if (!rejected && same.every((x) => !x.sources.length)) state.entities = state.entities.filter((x) => !same.includes(x));
+      else for (const x of same) x.status = rejected ? "manual" : "rejected_user";
+      closePopover(); reapply();
+    };
     $("popClose").onclick = closePopover;
   }
 
-
+  function showPopover(pop, rect) {
+    pop.classList.remove("hidden");
+    const w = pop.offsetWidth || 300;
+    pop.style.left = Math.max(10, Math.min(window.scrollX + rect.left, window.scrollX + window.innerWidth - w - 10)) + "px";
+    pop.style.top = window.scrollY + rect.bottom + 6 + "px";
+  }
   function closePopover() { $("popover").classList.add("hidden"); }
+
+  // ---------- Stellen manuell markieren ----------
+  // DOM-Position → Offset im Originaltext. Nur freie Textstücke tragen data-o, Treffer nicht.
+  function domToOffset(node, off) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const p = node.parentElement;
+      return p && p.dataset.o != null && !p.closest("mark") ? Number(p.dataset.o) + off : null;
+    }
+    const next = node.childNodes[off], prev = node.childNodes[off - 1];
+    if (next && next.dataset && next.dataset.o != null) return Number(next.dataset.o);
+    if (prev && prev.dataset && prev.dataset.o != null) return Number(prev.dataset.o) + prev.textContent.length;
+    return null;
+  }
+  const overlapsEntity = (s, e) => state.entities.some((x) => x.start < e && s < x.end);
+  function selectedSpan() {
+    const sel = getSelection();
+    if (!sel.rangeCount || sel.isCollapsed) return null;
+    const r = sel.getRangeAt(0), box = $("resultArea").querySelector(".annotated-text");
+    if (!box || !box.contains(r.commonAncestorContainer)) return null;
+    let s = domToOffset(r.startContainer, r.startOffset), e = domToOffset(r.endContainer, r.endOffset);
+    const touches = { error: "Die Markierung berührt eine bereits markierte Stelle. Bitte nur unmarkierten Text auswählen." };
+    if (s == null || e == null) return touches;
+    const t = state.text;
+    while (s < e && /\s/.test(t[s])) s++;
+    while (e > s && /\s/.test(t[e - 1])) e--;
+    if (s >= e) return null;
+    if (overlapsEntity(s, e)) return touches;
+    return { start: s, end: e, text: t.slice(s, e), rect: r.getBoundingClientRect() };
+  }
+  // Die markierte Stelle plus jedes weitere freie Vorkommen desselben Werts als ganzes Wort.
+  function occurrences(span) {
+    const re = new RegExp(`(?<![\\p{L}\\p{N}])${span.text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\p{L}\\p{N}])`, "gu");
+    const out = [span];
+    for (const m of state.text.matchAll(re)) {
+      const s = m.index, e = s + m[0].length;
+      if (s !== span.start && !overlapsEntity(s, e)) out.push({ start: s, end: e });
+    }
+    return out;
+  }
+  async function addManual(spans, category) {
+    let id = Math.max(0, ...state.entities.map((x) => x.id)) + 1;
+    for (const o of spans) {
+      state.entities.push({ id: id++, start: o.start, end: o.end, text: state.text.slice(o.start, o.end), category, sources: [], laya: null, placeholder: null, status: "manual" });
+    }
+    getSelection().removeAllRanges();
+    await reapply();
+  }
+  function openSelectionPopover(span) {
+    const pop = $("popover"), spans = occurrences(span), n = spans.length;
+    const chips = Object.keys(CONFIG.categories).map((k) => `<button class="catchip" data-cat="${k}" style="--c:${color(k)}">${esc(label(k))}</button>`).join("");
+    pop.innerHTML = `<div class="title">${esc(span.text)} <span class="arrow">→</span> <span class="muted">Art wählen</span><button id="popClose" class="x" title="Schließen">×</button></div>
+      <div class="chips">${chips}</div>
+      ${n > 1 ? `<label class="allocc"><input id="popAll" type="checkbox" checked> alle ${n} Vorkommen ersetzen</label>` : ""}`;
+    showPopover(pop, span.rect);
+    pop.querySelectorAll(".catchip").forEach((b) => { b.onclick = async () => {
+      const all = n > 1 && $("popAll").checked, cat = b.dataset.cat;
+      closePopover();
+      await addManual(all ? spans : [span], cat);
+      toast(`„${span.text}“ als ${label(cat)} ersetzt${all ? ` (${n} Vorkommen)` : ""}.`);
+    }; });
+    $("popClose").onclick = closePopover;
+  }
 
   // ---------- Rückübersetzung (rein im Browser) ----------
   function placeholderPattern(ph) {
@@ -239,7 +309,12 @@
   $("text").addEventListener("paste", () => { lastInputWasPaste = true; });
   $("text").addEventListener("input", () => { if (lastInputWasPaste) { lastInputWasPaste = false; run(false); } });
   $("text").addEventListener("keydown", (e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") run(false); });
-  $("resultArea").addEventListener("click", (e) => { const m = e.target.closest("mark.ent"); if (m) openPopover(m); });
+  $("resultArea").addEventListener("click", (e) => { const m = e.target.closest("mark.ent"); if (m && getSelection().isCollapsed) openPopover(m); });
+  // Auswahl erst nach dem Klick-Event auswerten, sonst schließt der Dokument-Klick das Popup sofort.
+  $("resultArea").addEventListener("mouseup", () => setTimeout(() => {
+    const span = selectedSpan();
+    if (span && span.error) toast(span.error); else if (span) openSelectionPopover(span);
+  }, 0));
   document.addEventListener("click", (e) => { if (!e.target.closest("#popover") && !e.target.closest("mark.ent")) closePopover(); });
   document.addEventListener("click", (e) => { if (e.target.closest("#copyAnon")) copy(state.anonymized || "", "Anonymisierter Text kopiert. Er enthält keine Markierungen und keine Originale."); });
   $("exportMap").onclick = exportMapping;
