@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sensible Inhalte für ChatGPT ersetzen</title>
-<link rel="stylesheet" href="/static/style.css?v=11">
+<link rel="stylesheet" href="/static/style.css?v=12">
 </head>
 <body>
 <header>
@@ -17,6 +17,7 @@
 
 <div id="info" class="infobox hidden">
   <p><strong>Was passiert:</strong> Du fügst einen Text ein. Die App prüft, ob darin Namen, Adressen, Telefonnummern, Kundennummern, Bankdaten oder Ähnliches vorkommen, und ersetzt diese Stellen durch Platzhalter wie <code>[PERSON_1]</code>. Den anonymisierten Text kopierst du in ChatGPT oder eine andere KI. Die Antwort fügst du in Schritt 3 wieder ein, und die Platzhalter werden gegen die echten Namen zurückgetauscht.</p>
+  <p><strong>Wie lang der Text sein darf:</strong> bis <span class="maxpages">etwa 15 Seiten</span>, gerechnet mit rund <span id="pageChars">3.300</span> Zeichen pro A4-Seite Fließtext. Längere Texte bitte in Teilen anonymisieren.</p>
   <p><strong>Was bleibt wo:</strong> Alles läuft auf diesem Rechner. Der Text wird an keinen Dienst im Internet geschickt. Die Tabelle, welcher Platzhalter wofür steht, liegt nur in deinem Browser.</p>
   <p><strong>Womit:</strong> Drei Erkenner suchen Treffer: GLiNER2-PII (ein mehrsprachiges Modell für personenbezogene Daten), spaCy (deutsches Sprachmodell für Namen, Orte, Firmen) und feste Muster für E-Mail-Adresse, Telefon, IBAN, Datum und Kennungen. Das Modell Laya bewertet vorab, ob der Text überhaupt sensible Inhalte enthält, und bestätigt danach jeden einzelnen Treffer im Satzzusammenhang.</p>
   <p><strong>Wenn etwas falsch erkannt wird:</strong> Klick auf die markierte Stelle. Dort kannst du den Treffer ablehnen (dann bleibt das Wort stehen) oder die Art ändern. Die Änderung gilt für alle Vorkommen desselben Werts.</p>
@@ -31,7 +32,7 @@
     <button class="stagehead"><span class="num">1</span><span class="ttl">Text einfügen</span><span class="sum"></span><span class="chev"></span></button>
     <section class="col input">
       <div class="row between">
-        <p class="hint">Text hier einfügen oder unten ein Beispiel wählen.</p>
+        <p class="hint">Text hier einfügen (bis <span class="maxpages">etwa 15 Seiten</span>) oder unten ein Beispiel wählen.</p>
         <button id="clear" class="ghost small">Leeren</button>
       </div>
       <textarea id="text" placeholder="Text hier einfügen …" spellcheck="false"></textarea>
@@ -92,6 +93,6 @@
 
 <div id="popover" class="popover hidden"></div>
 <div id="toast" class="toast hidden"></div>
-<script src="/static/app.js?v=11"></script>
+<script src="/static/app.js?v=12"></script>
 </body>
 </html>
