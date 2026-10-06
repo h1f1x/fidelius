@@ -10,7 +10,7 @@
   const emptyState = () => ({ text: "", entities: [], mapping: [], anonymized: "", gate: null, timing: null, elapsed_ms: null, copied: false });
   let state = emptyState();
   let lastInputWasPaste = false;
-  let clock = null;
+  let clock = null, hideBar = null;
 
   // ---------- Hilfen ----------
   const esc = (s) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -113,7 +113,7 @@
       try { CONFIG = await api("/api/config", null, ctl.signal); } catch {} finally { clearTimeout(timer); }
     }
     const estimate = estimateMs(CONFIG.calibration, text.length), bar = $("progress");
-    bar.value = 0; bar.classList.toggle("hidden", estimate == null);
+    clearTimeout(hideBar); bar.value = 0; bar.classList.toggle("hidden", estimate == null);
     const t0 = performance.now(), tick = () => {
       const ms = performance.now() - t0;
       if (estimate == null) { $("elapsed").textContent = "Prüfe … " + secs(ms); return; }
@@ -135,7 +135,11 @@
       showError(e.status === 413 ? `Der Text ist zu lang, möglich sind höchstens ${pages(CONFIG.max_text_chars)}. Bitte den Text kürzen.`
         : "Die Prüfung ist fehlgeschlagen: " + e.message + ". Bitte noch einmal versuchen.");
     }
-    finally { clearInterval(clock); $("run").disabled = false; $("force").disabled = false; renderElapsed(); }
+    finally {
+      clearInterval(clock); $("run").disabled = false; $("force").disabled = false; renderElapsed();
+      // Kurz auf 100 % stehen lassen, damit das Ende zu sehen ist; danach reicht „Geprüft in X s“.
+      hideBar = setTimeout(() => bar.classList.add("hidden"), 600);
+    }
   }
   async function reapply() {
     try {
@@ -153,7 +157,6 @@
 
   // ---------- Darstellung ----------
   // Gemessen im Browser: die Wartezeit inklusive Netzwerk, nicht nur die Rechenzeit des Servers.
-  // Der Balken bleibt nach der Prüfung auf 100 % stehen und geht mit dem Ergebnis.
   function renderElapsed() {
     $("elapsed").textContent = state.elapsed_ms != null ? "Geprüft in " + secs(state.elapsed_ms) : "";
     if (state.elapsed_ms == null) $("progress").classList.add("hidden");
