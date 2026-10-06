@@ -54,7 +54,7 @@ legend { font-size: 12px; color: var(--muted); }
 .gatebar { position: relative; height: 10px; border-radius: 5px; background: var(--border); overflow: hidden; margin-bottom: 4px; }
 #gatefill { height: 100%; background: linear-gradient(90deg, #76b041, #ffc914, #e4572e); width: 0; transition: width .3s; }
 #gatemark { position: absolute; top: -2px; width: 2px; height: 14px; background: var(--text); }
-.timing { font-size: 11px; color: var(--muted); }
+.timing { font-size: 11px; color: var(--muted); white-space: pre-line; }
 
 .annotated-text { white-space: pre-wrap; word-break: break-word; font: 13px/1.7 ui-monospace, SFMono-Regular, Menlo, monospace; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); flex: 1; overflow: auto; }
 mark.ent { --c: #999; background: color-mix(in srgb, var(--c) 22%, transparent); border-bottom: 2px solid var(--c); border-radius: 3px; padding: 0 2px; cursor: pointer; color: inherit; white-space: pre-wrap; }

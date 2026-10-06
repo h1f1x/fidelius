@@ -71,6 +71,12 @@
     for (const el of document.querySelectorAll(".maxpages")) el.textContent = pages(CONFIG.max_text_chars);
     $("pageChars").textContent = PAGE_CHARS.toLocaleString("de-DE");
   }
+  // Woher die Laufzeitschätzung kommt: gemessen beim Start dieses Dienstes, auf dieser Maschine.
+  function calibrationText(c) {
+    if (!c) return "Schätzung: noch keine Kalibrierung (läuft noch oder Laya war beim Start nicht erreichbar)";
+    const at = new Date(c.measured_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+    return `Schätzung: ${secs(c.base_ms)} Sockel + ${secs(c.rate_ms_per_char * PAGE_CHARS)} pro Seite, gemessen beim Start um ${at}`;
+  }
   function setExpert(on) {
     document.body.classList.toggle("expert", on);
     $("expertMode").checked = on;
@@ -120,7 +126,7 @@
   function render() {
     renderGate(); renderResult(); renderMapping(); renderElapsed();
     const t = state.timing;
-    $("timing").textContent = t ? `Einschätzung ${t.gate_ms} ms · Erkennung ${t.detect_ms} ms · Laya-Bestätigung ${t.laya_check_ms} ms · gesamt ${t.total_ms} ms` : "";
+    $("timing").textContent = t ? `Einschätzung ${t.gate_ms} ms · Erkennung ${t.detect_ms} ms · Laya-Bestätigung ${t.laya_check_ms} ms · gesamt ${t.total_ms} ms\n${calibrationText(CONFIG.calibration)}` : "";
     renderSteps();
   }
   function gateWord(p) {
