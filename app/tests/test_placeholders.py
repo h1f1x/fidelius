@@ -1,5 +1,5 @@
-from pii_app.models import Entity, Source
-from pii_app.placeholders import (anonymize, assign_placeholders, build_mapping, deanonymize,
+from fidelius.models import Entity, Source
+from fidelius.placeholders import (anonymize, assign_placeholders, build_mapping, deanonymize,
                                   normalize)
 
 

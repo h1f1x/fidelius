@@ -1,6 +1,6 @@
-from pii_app import config
-from pii_app.laya_client import _chunk, _context, _verdict
-from pii_app.models import Entity, Source
+from fidelius import config
+from fidelius.laya_client import _chunk, _context, _verdict
+from fidelius.models import Entity, Source
 
 
 def test_chunk_respects_paragraphs():

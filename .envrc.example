@@ -4,6 +4,7 @@ export LAYA_PORT=8000         # Port des Laya-Servers (nur innerhalb des Compose
 export OMP_NUM_THREADS=4      # CPU-Threads je Container, nicht über die Docker-CPU-Zahl
 export GATE_THRESHOLD=0.5     # Standard-Schwellwert für die Laya-Gesamtbewertung
 export LAYA_REJECT_THRESHOLD=0.9  # ab dieser Wahrscheinlichkeit für "nicht sensibel" lehnt Laya einen Treffer ab
+export REQUEST_LOG=/var/log/fidelius/requests.jsonl  # Request-Log im Container, liegt auf dem Volume request-log
 
 # Deployment (make deploy), siehe docs/deployen.md
 # export DEPLOY_HOST=user@vm  # ssh-Ziel, user@host oder Alias aus ~/.ssh/config

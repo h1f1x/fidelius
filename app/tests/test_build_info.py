@@ -1,6 +1,6 @@
 import re
 
-from pii_app import build_info
+from fidelius import build_info
 
 KEYS = ("BUILD_NUMBER", "BUILD_COMMIT", "BUILD_DIRTY", "BUILD_TIME")
 

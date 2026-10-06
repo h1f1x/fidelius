@@ -3,27 +3,45 @@
 (() => {
   const $ = (id) => document.getElementById(id);
   const SOURCE_BADGE = { gliner: "G", spacy: "S", regex: "R" };
-  const STORAGE_KEY = "pii-app-state-v2";
-  const EXPERT_KEY = "pii-app-expert";
+  const STORAGE_KEY = "fidelius-state-v2";
+  const EXPERT_KEY = "fidelius-expert";
 
   let CONFIG = { categories: {} };
   const emptyState = () => ({ text: "", entities: [], mapping: [], anonymized: "", gate: null, timing: null, elapsed_ms: null, copied: false });
   let state = emptyState();
   let lastInputWasPaste = false;
-  let clock = null;
+  let clock = null, hideBar = null;
 
   // ---------- Hilfen ----------
   const esc = (s) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const color = (cat) => (CONFIG.categories[cat] || {}).color || "#999";
   const label = (cat) => (CONFIG.categories[cat] || {}).label || cat;
   function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.remove("hidden"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.add("hidden"), 1800); }
-  const secs = (ms) => (ms / 1000).toLocaleString("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " s";
+  // Eine A4-Seite Fließtext, wie man sie aus Word kennt. Zeichen allein sagen Laien wenig.
+  const PAGE_CHARS = 3300;
+  // Zahlen in deutscher Schreibweise: 3.300 Zeichen, 1,5 s.
+  const num = (x, opts) => x.toLocaleString("de-DE", opts);
+  const pages = (chars) => { const n = Math.max(1, Math.round(chars / PAGE_CHARS)); return `etwa ${num(n)} ${n === 1 ? "Seite" : "Seiten"}`; };
+  const secs = (ms) => num(ms / 1000, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " s";
+  // Geschätzte Dauer einer Prüfung; null ohne Kalibrierung, dann gibt es keinen Balken. Eine Schätzung
+  // von null oder weniger taugt nicht als Nenner und gilt wie keine.
+  const estimateMs = (c, chars) => { const ms = c ? c.base_ms + c.rate_ms_per_char * chars : NaN; return ms > 0 ? ms : null; };
+  // Ist und Schätzung statt Countdown: ein falscher Countdown ärgert mehr als eine ehrliche Angabe.
+  // Der Balken hält bei 95 %, damit er nie „fertig“ zeigt, solange die Antwort noch fehlt.
+  // „Länger als geschätzt“ vergleicht die angezeigten ganzen Sekunden, sonst stünde dort „7 s von ca. 7 s,
+  // dauert länger als geschätzt“.
+  function progress(elapsed, estimate) {
+    const shown = Math.floor(elapsed / 1000), expected = Math.max(1, Math.round(estimate / 1000));
+    const text = `Prüfe … ${num(shown)} s von ca. ${num(expected)} s`;
+    const percent = estimate > 0 ? Math.round(Math.min(95, 100 * elapsed / estimate)) : 95;
+    return { percent, text: shown > expected ? text + ", dauert länger als geschätzt" : text };
+  }
   function showError(msg) { const e = $("error"); if (!msg) { e.classList.add("hidden"); return; } e.textContent = msg; e.classList.remove("hidden"); }
   async function copy(text, msg) { try { await navigator.clipboard.writeText(text); toast(msg); return true; } catch { toast("Kopieren nicht möglich, bitte Text manuell markieren."); return false; } }
   function save() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {} }
   function load() { try { const s = JSON.parse(localStorage.getItem(STORAGE_KEY)); if (s && s.text) state = s; } catch {} }
-  async function api(path, body) {
-    const r = await fetch(path, body ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : {});
+  async function api(path, body, signal) {
+    const r = await fetch(path, { ...(body ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : {}), signal });
     if (!r.ok) throw Object.assign(new Error((await r.json().catch(() => ({}))).detail || r.statusText), { status: r.status });
     return r.json();
   }
@@ -39,6 +57,7 @@
       return;
     }
     renderVersion(CONFIG.build);
+    renderLimit();
     $("threshold").value = CONFIG.gate_threshold; $("thresholdValue").textContent = Number(CONFIG.gate_threshold).toFixed(2);
     try {
       const ex = await api("/api/examples");
@@ -62,6 +81,17 @@
     const when = b.time ? " · gebaut " + new Date(b.time).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" }) : "";
     $("version").textContent = `v${b.version} · ${build}${when}`;
   }
+  // Die Grenze kommt vom Server, damit sie nach einer Änderung von MAX_TEXT_CHARS weiter stimmt.
+  function renderLimit() {
+    for (const el of document.querySelectorAll(".maxpages")) el.textContent = pages(CONFIG.max_text_chars);
+    $("pageChars").textContent = num(PAGE_CHARS);
+  }
+  // Woher die Laufzeitschätzung kommt: gemessen beim Start dieses Dienstes, auf dieser Maschine.
+  function calibrationText(c) {
+    if (!c) return "Schätzung: noch keine Kalibrierung (läuft noch oder Laya war beim Start nicht erreichbar)";
+    const at = new Date(c.measured_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+    return `Schätzung: ${secs(c.base_ms)} Sockel + ${secs(c.rate_ms_per_char * PAGE_CHARS)} pro Seite, gemessen beim Start um ${at}`;
+  }
   function setExpert(on) {
     document.body.classList.toggle("expert", on);
     $("expertMode").checked = on;
@@ -75,19 +105,41 @@
     // Ein altes Ergebnis passt nicht zum neuen Lauf; es verschwindet sofort, nicht erst mit der Antwort.
     clearResult();
     $("run").disabled = true; $("force").disabled = true;
-    const t0 = performance.now(), tick = () => { $("elapsed").textContent = "Prüfe … " + secs(performance.now() - t0); };
+    // Die Kalibrierung läuft nach dem Start im Hintergrund. Wer die Seite vorher geöffnet hat, soll den
+    // Balken trotzdem bekommen, sobald sie fertig ist.
+    // Hängt der Server, startet die Prüfung nach wenigen Sekunden trotzdem, mit der alten Config.
+    if (!CONFIG.calibration) {
+      const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 3000);
+      try { CONFIG = await api("/api/config", null, ctl.signal); } catch {} finally { clearTimeout(timer); }
+    }
+    const estimate = estimateMs(CONFIG.calibration, text.length), bar = $("progress");
+    clearTimeout(hideBar); bar.value = 0; bar.classList.toggle("hidden", estimate == null);
+    const t0 = performance.now(), tick = () => {
+      const ms = performance.now() - t0;
+      if (estimate == null) { $("elapsed").textContent = "Prüfe … " + secs(ms); return; }
+      const p = progress(ms, estimate);
+      bar.value = p.percent; $("elapsed").textContent = p.text;
+    };
     clearInterval(clock); tick(); clock = setInterval(tick, 100);
     try {
       const res = await api("/api/analyze", { text, gate_threshold: Number($("threshold").value), force, use_laya_check: $("layaCheck").checked });
       state = { text: res.text, entities: res.entities, mapping: res.mapping, anonymized: res.anonymized_text, gate: res.gate, timing: res.timing, elapsed_ms: Math.round(performance.now() - t0) };
+      // Fertig ist fertig, auch früher als geschätzt, etwa wenn das Gate den Text als harmlos einstuft.
+      bar.value = 100;
       save(); render();
       showError(null);
     } catch (e) {
-      // Zu langer Text: Wiederholen hilft nicht, nur Kürzen.
-      showError(e.status === 413 ? e.message + ". Bitte den Text kürzen."
+      // Zu langer Text: Wiederholen hilft nicht, nur Kürzen. Beim Analysieren heißt 413 immer zu langer
+      // Text, ob über die Textgrenze oder die Body-Grenze; die Meldung nennt deshalb die Seiten statt
+      // des Server-Texts mit seinen Zeichenzahlen.
+      showError(e.status === 413 ? `Der Text ist zu lang, möglich sind höchstens ${pages(CONFIG.max_text_chars)}. Bitte den Text kürzen.`
         : "Die Prüfung ist fehlgeschlagen: " + e.message + ". Bitte noch einmal versuchen.");
     }
-    finally { clearInterval(clock); $("run").disabled = false; $("force").disabled = false; renderElapsed(); }
+    finally {
+      clearInterval(clock); $("run").disabled = false; $("force").disabled = false; renderElapsed();
+      // Kurz auf 100 % stehen lassen, damit das Ende zu sehen ist; danach reicht „Geprüft in X s“.
+      hideBar = setTimeout(() => bar.classList.add("hidden"), 600);
+    }
   }
   async function reapply() {
     try {
@@ -105,11 +157,14 @@
 
   // ---------- Darstellung ----------
   // Gemessen im Browser: die Wartezeit inklusive Netzwerk, nicht nur die Rechenzeit des Servers.
-  function renderElapsed() { $("elapsed").textContent = state.elapsed_ms != null ? "Geprüft in " + secs(state.elapsed_ms) : ""; }
+  function renderElapsed() {
+    $("elapsed").textContent = state.elapsed_ms != null ? "Geprüft in " + secs(state.elapsed_ms) : "";
+    if (state.elapsed_ms == null) $("progress").classList.add("hidden");
+  }
   function render() {
     renderGate(); renderResult(); renderMapping(); renderElapsed();
     const t = state.timing;
-    $("timing").textContent = t ? `Einschätzung ${t.gate_ms} ms · Erkennung ${t.detect_ms} ms · Laya-Bestätigung ${t.laya_check_ms} ms · gesamt ${t.total_ms} ms` : "";
+    $("timing").textContent = t ? `Einschätzung ${t.gate_ms} ms · Erkennung ${t.detect_ms} ms · Laya-Bestätigung ${t.laya_check_ms} ms · gesamt ${t.total_ms} ms\n${calibrationText(CONFIG.calibration)}` : "";
     renderSteps();
   }
   function gateWord(p) {
@@ -217,7 +272,7 @@
   }
   function stepSummary(i, st) {
     if (i === 0) return st.notSensitive ? "nichts Sensibles gefunden"
-      : `${state.text.length.toLocaleString("de-DE")} Zeichen · ${state.mapping.length} Ersetzungen`;
+      : `${num(state.text.length)} Zeichen · ${state.mapping.length} Ersetzungen`;
     if (i === 1) return state.copied ? "kopiert" : "Antwort liegt vor";
     return $("restoreInfo").textContent;
   }

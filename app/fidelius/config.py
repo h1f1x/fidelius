@@ -41,6 +41,10 @@ GLINER_LABELS: dict[str, str] = {
 }
 GLINER_MODEL = "fastino/gliner2-privacy-filter-PII-multi"
 GLINER_THRESHOLD = float(os.environ.get("GLINER_THRESHOLD", "0.5"))
+# GLiNER2 bekommt den Text in Fenstern: Sein Speicher wächst überlinear mit der Länge, ab ~6.000
+# Zeichen um Gigabytes (#9). Die Überlappung fasst Namen, die auf einer Fenstergrenze liegen.
+GLINER_WINDOW_CHARS = 2000
+GLINER_WINDOW_OVERLAP = 200
 
 # spaCy de_core_news_lg: PER, LOC, ORG, MISC. MISC wird ignoriert.
 SPACY_LABELS: dict[str, str] = {"PER": "PERSON", "LOC": "ORT", "ORG": "ORG"}
@@ -97,6 +101,10 @@ DATE_STOPWORDS = {
 }
 
 EXAMPLES_DIR = os.environ.get("EXAMPLES_DIR", "/opt/examples")
+
+# Eine JSON-Zeile je Prüfung für die spätere Auswertung (Textlängen, Gate-Quote, Dauern).
+# Liegt auf einem Volume, weil docker logs einen Deploy nicht überdauert.
+REQUEST_LOG = os.environ.get("REQUEST_LOG", "/var/log/fidelius/requests.jsonl")
 
 # Obergrenze je Anfrage. Eine lange Mailkette hat einige tausend Zeichen; ohne Grenze hält ein
 # einzelner Request mit Megabytes an Text die CPU minutenlang fest.
