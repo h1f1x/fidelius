@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sensible Inhalte für ChatGPT ersetzen</title>
-<link rel="stylesheet" href="/static/style.css?v=13">
+<link rel="stylesheet" href="/static/style.css?v=14">
 </head>
 <body>
 <header>
@@ -42,6 +42,7 @@
       </div>
       <div class="row buttons">
         <button id="run" class="primary">Anonymisieren</button>
+        <progress id="progress" class="hidden" max="100" value="0" aria-label="Fortschritt der Prüfung, geschätzt" aria-describedby="elapsed"></progress>
         <span id="elapsed" class="muted"></span>
       </div>
       <div class="row controls expert-only">
@@ -93,6 +94,6 @@
 
 <div id="popover" class="popover hidden"></div>
 <div id="toast" class="toast hidden"></div>
-<script src="/static/app.js?v=13"></script>
+<script src="/static/app.js?v=14"></script>
 </body>
 </html>

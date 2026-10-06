@@ -21,6 +21,15 @@
   const PAGE_CHARS = 3300;
   const pages = (chars) => { const n = Math.max(1, Math.round(chars / PAGE_CHARS)); return `etwa ${n.toLocaleString("de-DE")} ${n === 1 ? "Seite" : "Seiten"}`; };
   const secs = (ms) => (ms / 1000).toLocaleString("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " s";
+  // Geschätzte Dauer einer Prüfung; null ohne Kalibrierung, dann gibt es keinen Balken.
+  const estimateMs = (c, chars) => c ? c.base_ms + c.rate_ms_per_char * chars : null;
+  // Ist und Schätzung statt Countdown: ein falscher Countdown ärgert mehr als eine ehrliche Angabe.
+  // Der Balken hält bei 95 %, damit er nie „fertig“ zeigt, solange die Antwort noch fehlt.
+  function progress(elapsed, estimate) {
+    const n = (s) => s.toLocaleString("de-DE");
+    const text = `Prüfe … ${n(Math.floor(elapsed / 1000))} s von ca. ${n(Math.max(1, Math.round(estimate / 1000)))} s`;
+    return { percent: Math.round(Math.min(95, 100 * elapsed / estimate)), text: elapsed > estimate ? text + ", dauert länger als geschätzt" : text };
+  }
   function showError(msg) { const e = $("error"); if (!msg) { e.classList.add("hidden"); return; } e.textContent = msg; e.classList.remove("hidden"); }
   async function copy(text, msg) { try { await navigator.clipboard.writeText(text); toast(msg); return true; } catch { toast("Kopieren nicht möglich, bitte Text manuell markieren."); return false; } }
   function save() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {} }
@@ -90,11 +99,23 @@
     // Ein altes Ergebnis passt nicht zum neuen Lauf; es verschwindet sofort, nicht erst mit der Antwort.
     clearResult();
     $("run").disabled = true; $("force").disabled = true;
-    const t0 = performance.now(), tick = () => { $("elapsed").textContent = "Prüfe … " + secs(performance.now() - t0); };
+    // Die Kalibrierung läuft nach dem Start im Hintergrund. Wer die Seite vorher geöffnet hat, soll den
+    // Balken trotzdem bekommen, sobald sie fertig ist.
+    if (!CONFIG.calibration) { try { CONFIG = await api("/api/config"); } catch {} }
+    const estimate = estimateMs(CONFIG.calibration, text.length), bar = $("progress");
+    bar.value = 0; bar.classList.toggle("hidden", estimate == null);
+    const t0 = performance.now(), tick = () => {
+      const ms = performance.now() - t0;
+      if (estimate == null) { $("elapsed").textContent = "Prüfe … " + secs(ms); return; }
+      const p = progress(ms, estimate);
+      bar.value = p.percent; $("elapsed").textContent = p.text;
+    };
     clearInterval(clock); tick(); clock = setInterval(tick, 100);
     try {
       const res = await api("/api/analyze", { text, gate_threshold: Number($("threshold").value), force, use_laya_check: $("layaCheck").checked });
       state = { text: res.text, entities: res.entities, mapping: res.mapping, anonymized: res.anonymized_text, gate: res.gate, timing: res.timing, elapsed_ms: Math.round(performance.now() - t0) };
+      // Fertig ist fertig, auch früher als geschätzt, etwa wenn das Gate den Text als harmlos einstuft.
+      bar.value = 100;
       save(); render();
       showError(null);
     } catch (e) {
@@ -122,7 +143,11 @@
 
   // ---------- Darstellung ----------
   // Gemessen im Browser: die Wartezeit inklusive Netzwerk, nicht nur die Rechenzeit des Servers.
-  function renderElapsed() { $("elapsed").textContent = state.elapsed_ms != null ? "Geprüft in " + secs(state.elapsed_ms) : ""; }
+  // Der Balken bleibt nach der Prüfung auf 100 % stehen und geht mit dem Ergebnis.
+  function renderElapsed() {
+    $("elapsed").textContent = state.elapsed_ms != null ? "Geprüft in " + secs(state.elapsed_ms) : "";
+    if (state.elapsed_ms == null) $("progress").classList.add("hidden");
+  }
   function render() {
     renderGate(); renderResult(); renderMapping(); renderElapsed();
     const t = state.timing;

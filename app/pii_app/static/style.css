@@ -54,6 +54,11 @@ legend { font-size: 12px; color: var(--muted); }
 .gatebar { position: relative; height: 10px; border-radius: 5px; background: var(--border); overflow: hidden; margin-bottom: 4px; }
 #gatefill { height: 100%; background: linear-gradient(90deg, #76b041, #ffc914, #e4572e); width: 0; transition: width .3s; }
 #gatemark { position: absolute; top: -2px; width: 2px; height: 14px; background: var(--text); }
+/* Fortschritt der Prüfung, in der Optik des Gate-Balkens. */
+#progress { appearance: none; -webkit-appearance: none; width: 160px; height: 10px; border: 0; border-radius: 5px; background: var(--border); overflow: hidden; }
+#progress::-webkit-progress-bar { background: var(--border); border-radius: 5px; }
+#progress::-webkit-progress-value { background: var(--primary); border-radius: 5px; transition: width .3s; }
+#progress::-moz-progress-bar { background: var(--primary); border-radius: 5px; }
 .timing { font-size: 11px; color: var(--muted); white-space: pre-line; }
 
 .annotated-text { white-space: pre-wrap; word-break: break-word; font: 13px/1.7 ui-monospace, SFMono-Regular, Menlo, monospace; padding: 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); flex: 1; overflow: auto; }
