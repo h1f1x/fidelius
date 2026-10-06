@@ -36,6 +36,14 @@ class Calibration:
         return thread
 
     def run(self) -> None:
+        # Im Hintergrund-Thread verschwände eine Exception ohne Spur; die App liefe
+        # dann ohne Schätzung weiter, und niemand wüsste warum.
+        try:
+            self._calibrate()
+        except Exception:
+            log.exception("Kalibrierung fehlgeschlagen, die App läuft ohne Laufzeitschätzung.")
+
+    def _calibrate(self) -> None:
         try:
             texts = self._texts()
         except OSError as exc:
