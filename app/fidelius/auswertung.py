@@ -1,4 +1,37 @@
-"""Auswertung des Request-Logs."""
+"""Auswertung des Request-Logs, Spec: docs/specs/request-log-auswertung.md.
+
+Liest das ganze Log bei jedem Aufruf (10.000 Anfragen ~ 3 MB). Kaputte Zeilen werden gezählt und
+übersprungen. Alle Kennzahlen außer „kalibrierung“ beziehen sich nur auf quelle = anfrage.
+Perzentile nach Nearest-Rank. Zeiten in der Antwort sind ISO 8601 in Europe/Berlin, Dauern in ms,
+Anteile als Bruch (0.2 = 20 %). Ohne Werte steht null.
+
+Antwort von auswerten() bzw. GET /api/auswertung?zeitraum=24h|7t|30t|alles (Standard 30t):
+
+    zeitraum        "24h" | "7t" | "30t" | "alles"
+    log             {pfad, vorhanden, zeilen, kaputt}; vorhanden = false: Datei fehlt oder ist leer
+    kennzahlen      {anfragen, gesamt_median_ms, gesamt_p90_ms, je_1000_median_ms,
+                     fehler, fehlerquote, sensibel_anteil}
+    vorperiode      wie kennzahlen, für die gleich lange Periode davor; null bei 30t und alles
+                    oder wenn die Vorperiode keine Anfragen hat („kein Vergleich“)
+    phasen          {gate, erkennung, laya, gesamt}, je {anzahl, median_ms, p90_ms, p99_ms};
+                    eine Phase zählt nur bei Anfragen, in denen sie lief
+    histogramm      {bis_ms, breite_ms, anzahl: [24 Zahlen]}; Balken i deckt
+                    [i·breite_ms, (i+1)·breite_ms), bis_ms = p99, Werte darüber zählen im letzten
+    laengenklassen  [{label, bis_zeichen, anzahl, median_ms, p90_ms}], 5 Klassen à 3.300 Zeichen,
+                    bis_zeichen = null bei der letzten
+    streuung        [[zeichen, gesamt_ms, build]], ein Punkt je Anfrage; build wie builds[].name
+    nutzung         {tage: [{tag: "JJJJ-MM-TT", anzahl}] lückenlos über den Zeitraum,
+                     stunden: [24 Zahlen], Index = Stunde in Berliner Zeit}
+    builds          [{name, nummer, commit, dirty, erste, letzte, anfragen, median_ms, p90_ms,
+                     je_1000_median_ms, abweichung_vorgaenger}], sortiert nach erstem Auftauchen;
+                    name z. B. "#37 · 0d15b11" („*“ = dirty); erste/letzte inkl. Kalibrierung;
+                    abweichung_vorgaenger je 1.000 Zeichen zum letzten Build mit Anfragen
+                    (0.2 = 20 % langsamer, negativ = schneller)
+    kalibrierung    {texte: [Zeichenzahlen], zeilen: [{build, laeufe, median_ms: [je Text]}]}
+    fehler          [{text, anzahl, zuletzt}], häufigste zuerst
+
+GET /api/request-log liefert die Rohdatei als application/x-ndjson, 404 wenn sie fehlt.
+"""
 from __future__ import annotations
 
 import json
@@ -53,6 +86,8 @@ def _eintrag(zeile: str) -> dict | None:
 
 
 def auswerten(pfad: str | Path, zeitraum: str, jetzt: datetime | None = None) -> dict:
+    if zeitraum not in ZEITRAEUME:
+        raise ValueError(f"Unbekannter Zeitraum {zeitraum!r}, erlaubt: {', '.join(ZEITRAEUME)}")
     pfad = Path(pfad)
     jetzt = jetzt or datetime.now(UTC)
     alle, zeilen, kaputt = lesen(pfad)
@@ -63,6 +98,7 @@ def auswerten(pfad: str | Path, zeitraum: str, jetzt: datetime | None = None) ->
     if zeitraum in MIT_VERGLEICH:
         vorher = _anfragen(_zwischen(alle, jetzt - 2 * dauer, jetzt - dauer))
     return {
+        "zeitraum": zeitraum,
         "log": {"pfad": str(pfad), "vorhanden": zeilen > 0, "zeilen": zeilen, "kaputt": kaputt},
         "kennzahlen": _kennzahlen(anfragen),
         "vorperiode": _kennzahlen(vorher) if vorher else None,
@@ -125,18 +161,20 @@ def _builds(eintraege: list[dict]) -> list[dict]:
 
 
 def _kalibrierung(eintraege: list[dict]) -> dict:
-    """Gleiche Texte machen Builds direkt vergleichbar; der Text ist an seiner Zeichenzahl kenntlich."""
+    """Gleiche Texte machen Builds direkt vergleichbar; die Zeichenzahl kennzeichnet den Text."""
     kalib = [e for e in eintraege if e.get("quelle") == "kalibrierung"]
     texte = sorted({e["zeichen"] for e in kalib})
     zeilen = []
     for name, gruppe in _nach_build(kalib).items():
-        median = [perzentil([e["gesamt_ms"] for e in gruppe if e["zeichen"] == z], 50) for z in texte]
+        median = [perzentil([e["gesamt_ms"] for e in gruppe if e["zeichen"] == z], 50)
+                  for z in texte]
         zeilen.append({"build": name, "laeufe": len(gruppe), "median_ms": median})
     return {"texte": texte, "zeilen": zeilen}
 
 
 def _nutzung(anfragen: list[dict], anfang: datetime | None, ende: datetime) -> dict:
-    """Tage lückenlos vom Anfang des Zeitraums (bei „alles“: erste Anfrage) bis heute, in Berliner Zeit."""
+    """Tage in Berliner Zeit, lückenlos vom Anfang des Zeitraums bis heute; bei „alles“ von der
+    ersten bis zur letzten Anfrage."""
     tage: dict[date, int] = {}
     stunden = [0] * 24
     for e in anfragen:
@@ -157,8 +195,9 @@ def _nutzung(anfragen: list[dict], anfang: datetime | None, ende: datetime) -> d
 def build_name(b) -> str:
     if not isinstance(b, dict):
         return "unbekannt"
-    nummer = b.get("number")
-    return f"#{'?' if nummer is None else nummer} · {b.get('commit') or '?'}{'*' if b.get('dirty') else ''}"
+    nummer = "?" if b.get("number") is None else b["number"]
+    dirty = "*" if b.get("dirty") else ""
+    return f"#{nummer} · {b.get('commit') or '?'}{dirty}"
 
 
 def _histogramm(werte: list) -> dict:
@@ -189,19 +228,21 @@ def _erkennung_lief(e: dict) -> bool:
 
 def _laya_lief(e: dict) -> bool:
     # Wie in pipeline.analyze: Ohne Gate-Wert war Laya nicht erreichbar, die Bestätigung entfällt.
-    return _erkennung_lief(e) and bool(e.get("laya_bestaetigung")) and e.get("gate_wert") is not None
+    return (_erkennung_lief(e) and bool(e.get("laya_bestaetigung"))
+            and e.get("gate_wert") is not None)
 
 
 def _verteilung(werte: list) -> dict:
+    werte = [v for v in werte if _zahl(v)]
     return {"anzahl": len(werte), "median_ms": perzentil(werte, 50),
             "p90_ms": perzentil(werte, 90), "p99_ms": perzentil(werte, 99)}
 
 
 def _phasen(anfragen: list[dict]) -> dict:
     return {
-        "gate": _verteilung([e.get("gate_ms", 0) for e in anfragen]),
-        "erkennung": _verteilung([e.get("erkennung_ms", 0) for e in anfragen if _erkennung_lief(e)]),
-        "laya": _verteilung([e.get("laya_ms", 0) for e in anfragen if _laya_lief(e)]),
+        "gate": _verteilung([e.get("gate_ms") for e in anfragen]),
+        "erkennung": _verteilung([e.get("erkennung_ms") for e in anfragen if _erkennung_lief(e)]),
+        "laya": _verteilung([e.get("laya_ms") for e in anfragen if _laya_lief(e)]),
         "gesamt": _verteilung([e["gesamt_ms"] for e in anfragen]),
     }
 

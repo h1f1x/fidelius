@@ -9,7 +9,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import build_info, config
+from . import auswertung, build_info, config
 from .calibration import Calibration
 from .detectors import gliner, spacy_det
 from .models import AnalyzeRequest, AnalyzeResponse, ApplyRequest, ApplyResponse
@@ -119,6 +119,23 @@ def apply(req: ApplyRequest) -> ApplyResponse:
         raise HTTPException(413, f"Zu viele Stellen ({len(req.entities)}, höchstens {config.MAX_ENTITIES})")
     entities, anonymized, mapping = pipeline.apply(req.text, req.entities)
     return ApplyResponse(entities=entities, anonymized_text=anonymized, mapping=mapping)
+
+
+@app.get("/api/auswertung")
+def get_auswertung(zeitraum: str = "30t") -> dict:
+    """Fehlt das Log, kommt trotzdem eine Antwort mit log.vorhanden = false und dem Pfad."""
+    try:
+        return auswertung.auswerten(config.REQUEST_LOG, zeitraum)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.get("/api/request-log")
+def get_request_log() -> FileResponse:
+    p = Path(config.REQUEST_LOG)
+    if not p.is_file():
+        raise HTTPException(404, f"Kein Request-Log vorhanden ({p})")
+    return FileResponse(p, media_type="application/x-ndjson", filename="requests.jsonl")
 
 
 @app.get("/")
