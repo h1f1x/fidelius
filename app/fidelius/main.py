@@ -9,7 +9,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import auswertung, build_info, config
+from . import build_info, config, log_report
 from .calibration import Calibration
 from .detectors import gliner, spacy_det
 from .models import AnalyzeRequest, AnalyzeResponse, ApplyRequest, ApplyResponse
@@ -121,11 +121,11 @@ def apply(req: ApplyRequest) -> ApplyResponse:
     return ApplyResponse(entities=entities, anonymized_text=anonymized, mapping=mapping)
 
 
-@app.get("/api/auswertung")
-def get_auswertung(zeitraum: str = "30t") -> dict:
-    """Fehlt das Log, kommt trotzdem eine Antwort mit log.vorhanden = false und dem Pfad."""
+@app.get("/api/report")
+def get_report(period: str = "30d") -> dict:
+    """Fehlt das Log, kommt trotzdem eine Antwort mit log.present = false und dem Pfad."""
     try:
-        return auswertung.auswerten(config.REQUEST_LOG, zeitraum)
+        return log_report.report(config.REQUEST_LOG, period)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
 
@@ -144,8 +144,8 @@ def index() -> FileResponse:
 
 
 @app.get("/auswertung")
-def auswertung_seite() -> FileResponse:
-    return FileResponse(STATIC / "auswertung.html")
+def report_page() -> FileResponse:
+    return FileResponse(STATIC / "report.html")
 
 
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
