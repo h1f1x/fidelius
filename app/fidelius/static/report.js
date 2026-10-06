@@ -126,9 +126,9 @@
     ${PHASES.map(([key, label]) => { const p = phases[key] || {}; return `<tr><td>${label}</td>${numCell(integer(p.count))}${numCell(ms(p.median_ms))}${numCell(ms(p.p90_ms))}${numCell(ms(p.p99_ms))}</tr>`; }).join("")}
     </tbody></table>`;
 
-  const lengthTable = (classes) => `<table><thead><tr><th>Textlänge</th><th class="num">Anfragen</th><th class="num">Median</th><th class="num">p90</th></tr></thead><tbody>
+  const lengthTable = (classes, pageChars) => `<table><thead><tr><th>Textlänge</th><th class="num">Anfragen</th><th class="num">Median</th><th class="num">p90</th></tr></thead><tbody>
     ${classes.map((c) => `<tr><td>${esc(c.label)}</td>${numCell(integer(c.count))}${numCell(ms(c.median_ms))}${numCell(ms(c.p90_ms))}</tr>`).join("")}
-    </tbody></table><p class="hint">Eine Seite sind 3.300 Zeichen.</p>`;
+    </tbody></table><p class="hint">Eine Seite sind ${integer(pageChars)} Zeichen.</p>`;
 
   function change(delta) {
     if (!isNumber(delta)) return "";
@@ -162,6 +162,12 @@
   const periodPicker = () => `<span class="seg">${PERIODS.map(([key, label]) =>
     `<button data-period="${key}" class="${key === period ? "on" : ""}">${label}</button>`).join("")}</span>`;
 
+  // Titel links, darunter optional die Zeile zum Log; rechts die Zeitraumwahl.
+  const header = (info = "") => `<div class="top">
+      <div><h1>Auswertung Request-Log</h1>${info}</div>
+      ${periodPicker()}
+    </div>`;
+
   function logLine(log) {
     const parts = [`${integer(log.lines)} Zeilen`];
     if (log.broken) parts.push(`<span class="worse">${integer(log.broken)} kaputte Zeilen übersprungen</span>`);
@@ -173,30 +179,29 @@
   const kpi = (label, value, trendHtml) => `<div class="kpi"><div class="k">${label}</div><div class="v">${value}</div><div class="t">${trendHtml}</div></div>`;
 
   function page(data) {
-    const title = `<div><h1>Auswertung Request-Log</h1>`;
     if (!data.log.present) {
-      return `<div class="top">${title}</div>${periodPicker()}</div>
+      return `${header()}
         <div class="tile leer"><h2>Kein Request-Log vorhanden</h2><p class="hint">Erwartet unter <code>${esc(data.log.path)}</code>. Die Datei fehlt oder ist leer.</p></div>`;
     }
-    const m = data.metrics, prev = data.previous || {};
+    const metrics = data.metrics, previous = data.previous || {};
     const calibrationRuns = (data.calibration.rows || []).reduce((s, row) => s + (isNumber(row.runs) ? row.runs : 0), 0);
     const days = data.usage.days || [];
-    return `<div class="top">${title}<span class="hint">${logLine(data.log)}</span></div>${periodPicker()}</div>
+    return `${header(`<span class="hint">${logLine(data.log)}</span>`)}
       <div class="kpis">
-        ${kpi("Anfragen", integer(m.requests), trend(m.requests, prev.requests, -1))}
-        ${kpi("Median Gesamtzeit", ms(m.total_median_ms), trend(m.total_median_ms, prev.total_median_ms, 1))}
-        ${kpi("p90 Gesamtzeit", ms(m.total_p90_ms), trend(m.total_p90_ms, prev.total_p90_ms, 1))}
-        ${kpi("je 1.000 Zeichen (Median)", ms(m.per_1000_median_ms), trend(m.per_1000_median_ms, prev.per_1000_median_ms, 1))}
-        ${kpi("Fehlerquote", percent(m.error_rate), `${integer(m.error_count)} Fehler · ${trend(m.error_rate, prev.error_rate, 1, true)}`)}
-        ${kpi("als sensibel erkannt", percent(m.sensitive_share), trend(m.sensitive_share, prev.sensitive_share, 0, true))}
+        ${kpi("Anfragen", integer(metrics.requests), trend(metrics.requests, previous.requests, -1))}
+        ${kpi("Median Gesamtzeit", ms(metrics.total_median_ms), trend(metrics.total_median_ms, previous.total_median_ms, 1))}
+        ${kpi("p90 Gesamtzeit", ms(metrics.total_p90_ms), trend(metrics.total_p90_ms, previous.total_p90_ms, 1))}
+        ${kpi("je 1.000 Zeichen (Median)", ms(metrics.per_1000_median_ms), trend(metrics.per_1000_median_ms, previous.per_1000_median_ms, 1))}
+        ${kpi("Fehlerquote", percent(metrics.error_rate), `${integer(metrics.error_count)} Fehler · ${trend(metrics.error_rate, previous.error_rate, 1, true)}`)}
+        ${kpi("als sensibel erkannt", percent(metrics.sensitive_share), trend(metrics.sensitive_share, previous.sensitive_share, 0, true))}
       </div>
       <div class="grid">
         ${tile("Anfragen pro Tag", bars(days.map((d) => ({ label: shortDay(d.day), value: d.count })), { every: Math.ceil(days.length / 15) }))}
         ${tile("Anfragen nach Uhrzeit", bars(data.usage.hours.map((n, i) => ({ label: `${i} Uhr`, short: i % 3 ? "" : String(i), value: n }))))}
-        ${tile("Verteilung Gesamtzeit", histogram(data.histogram, [[m.total_median_ms, "Median"], [m.total_p90_ms, "p90"]]))}
+        ${tile("Verteilung Gesamtzeit", histogram(data.histogram, [[metrics.total_median_ms, "Median"], [metrics.total_p90_ms, "p90"]]))}
         ${tile("Wohin die Zeit geht (Median)", phaseBar(data.phases) + phaseTable(data.phases))}
         ${tile("Textlänge und Gesamtzeit", scatter(data.scatter, data.builds))}
-        ${tile("Nach Textlänge", lengthTable(data.length_classes))}
+        ${tile("Nach Textlänge", lengthTable(data.length_classes, data.page_chars))}
         ${tile("Builds", buildTable(data.builds), true)}
         ${tile(`Kalibrierung <span class="muted">· ${integer(calibrationRuns)} Läufe</span>`, calibrationTable(data.calibration))}
         ${tile("Fehler", errorTable(data.errors))}
@@ -214,7 +219,7 @@
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       root.innerHTML = page(await response.json());
     } catch (e) {
-      root.innerHTML = `<div class="top"><div><h1>Auswertung Request-Log</h1></div>${periodPicker()}</div>
+      root.innerHTML = `${header()}
         <div class="errorbox">Auswertung nicht abrufbar: ${esc(e.message)}</div>`;
     }
   }

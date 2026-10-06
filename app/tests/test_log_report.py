@@ -139,9 +139,10 @@ def test_length_classes_by_pages_of_3300_chars(tmp_path):
               entry(zeichen=3301, gesamt_ms=1000),
               entry(zeichen=60000, gesamt_ms=9000))
 
-    classes = report(path, "30d", now=NOW)["length_classes"]
+    result = report(path, "30d", now=NOW)
 
-    assert classes == [
+    assert result["page_chars"] == 3300
+    assert result["length_classes"] == [
         {"label": "≤ 1 Seite", "max_chars": 3300, "count": 2, "median_ms": 100, "p90_ms": 300},
         {"label": "1–3 Seiten", "max_chars": 9900, "count": 1, "median_ms": 1000, "p90_ms": 1000},
         {"label": "3–7 Seiten", "max_chars": 23100, "count": 0, "median_ms": None, "p90_ms": None},
