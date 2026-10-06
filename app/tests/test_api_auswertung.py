@@ -61,3 +61,18 @@ def test_raw_log_missing(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "REQUEST_LOG", str(tmp_path / "fehlt.jsonl"))
 
     assert TestClient(app).get("/api/request-log").status_code == 404
+
+
+def test_evaluation_page_is_served_as_html():
+    r = TestClient(app).get("/auswertung")
+
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("text/html")
+    assert "<title>Auswertung Request-Log</title>" in r.text
+    assert '<script src="/static/auswertung.js' in r.text
+
+
+def test_main_page_links_to_evaluation_in_expert_mode():
+    r = TestClient(app).get("/")
+
+    assert '<a href="/auswertung" class="infolink expert-only"' in r.text

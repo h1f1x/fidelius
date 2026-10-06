@@ -143,4 +143,9 @@ def index() -> FileResponse:
     return FileResponse(STATIC / "index.html")
 
 
+@app.get("/auswertung")
+def auswertung_seite() -> FileResponse:
+    return FileResponse(STATIC / "auswertung.html")
+
+
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
