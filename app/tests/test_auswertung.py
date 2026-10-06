@@ -80,17 +80,18 @@ def test_line_without_numbers_counts_as_broken(tmp_path):
     assert a["kennzahlen"]["anfragen"] == 1
 
 
-def test_previous_period_for_24h_and_7_days(tmp_path):
+def test_previous_period_for_all_but_everything(tmp_path):
     pfad = tmp_path / "requests.jsonl"
     schreibe(pfad,
              eintrag("2026-10-06T08:00:00+00:00", gesamt_ms=200),
              eintrag("2026-10-05T08:00:00+00:00", gesamt_ms=100),  # Vortag
-             eintrag("2026-10-04T08:00:00+00:00", gesamt_ms=100))  # vor der Vorperiode
+             eintrag("2026-10-04T08:00:00+00:00", gesamt_ms=100),  # vor der Vorperiode
+             eintrag("2026-08-20T08:00:00+00:00", gesamt_ms=300))  # Vorperiode von 30 Tagen
 
     assert auswerten(pfad, "24h", jetzt=JETZT)["vorperiode"]["anfragen"] == 1
     assert auswerten(pfad, "24h", jetzt=JETZT)["vorperiode"]["gesamt_median_ms"] == 100
     assert auswerten(pfad, "7t", jetzt=JETZT)["vorperiode"] is None  # Vorperiode leer
-    assert auswerten(pfad, "30t", jetzt=JETZT)["vorperiode"] is None
+    assert auswerten(pfad, "30t", jetzt=JETZT)["vorperiode"]["anfragen"] == 1
     assert auswerten(pfad, "alles", jetzt=JETZT)["vorperiode"] is None
 
 

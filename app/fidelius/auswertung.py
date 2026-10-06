@@ -11,7 +11,7 @@ Antwort von auswerten() bzw. GET /api/auswertung?zeitraum=24h|7t|30t|alles (Stan
     log             {pfad, vorhanden, zeilen, kaputt}; vorhanden = false: Datei fehlt oder ist leer
     kennzahlen      {anfragen, gesamt_median_ms, gesamt_p90_ms, je_1000_median_ms,
                      fehler, fehlerquote, sensibel_anteil}
-    vorperiode      wie kennzahlen, für die gleich lange Periode davor; null bei 30t und alles
+    vorperiode      wie kennzahlen, für die gleich lange Periode davor; null bei alles oder leerer Vorperiode
                     oder wenn die Vorperiode keine Anfragen hat („kein Vergleich“)
     phasen          {gate, erkennung, laya, gesamt}, je {anzahl, median_ms, p90_ms, p99_ms};
                     eine Phase zählt nur bei Anfragen, in denen sie lief
@@ -44,8 +44,8 @@ BERLIN = ZoneInfo("Europe/Berlin")
 
 ZEITRAEUME = {"24h": timedelta(hours=24), "7t": timedelta(days=7), "30t": timedelta(days=30),
               "alles": None}
-# Laut Spec nur bei den kurzen Zeiträumen ein Vergleich mit der gleich langen Vorperiode.
-MIT_VERGLEICH = {"24h", "7t"}
+# Vergleich mit der gleich langen Vorperiode; „alles“ hat keine.
+MIT_VERGLEICH = {"24h", "7t", "30t"}
 BALKEN = 24
 SEITE = 3300  # Zeichen, wie die Seitenangabe in der Haupt-UI
 LAENGENKLASSEN = [("≤ 1 Seite", SEITE), ("1–3 Seiten", 3 * SEITE), ("3–7 Seiten", 7 * SEITE),
