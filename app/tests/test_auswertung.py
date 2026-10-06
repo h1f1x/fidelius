@@ -114,3 +114,75 @@ def test_phases_count_only_requests_where_they_ran(tmp_path):
         "laya": {"anzahl": 1, "median_ms": 400, "p90_ms": 400, "p99_ms": 400},
         "gesamt": {"anzahl": 4, "median_ms": 520, "p90_ms": 950, "p99_ms": 950},
     }
+
+
+def test_histogram_is_cut_at_p99(tmp_path):
+    pfad = tmp_path / "requests.jsonl"
+    schreibe(pfad, *[eintrag(gesamt_ms=ms) for ms in range(1, 101)])
+
+    h = auswerten(pfad, "30t", jetzt=JETZT)["histogramm"]
+
+    assert h["bis_ms"] == 99
+    assert h["breite_ms"] == 4.125  # 24 Balken
+    assert len(h["anzahl"]) == 24
+    assert h["anzahl"][0] == 4      # 1–4 ms
+    assert h["anzahl"][-1] == 6     # 95–99 ms und der Ausreißer 100 ms
+    assert sum(h["anzahl"]) == 100
+
+
+def test_length_classes_by_pages_of_3300_chars(tmp_path):
+    pfad = tmp_path / "requests.jsonl"
+    schreibe(pfad,
+             eintrag(zeichen=3300, gesamt_ms=100),
+             eintrag(zeichen=200, gesamt_ms=300),
+             eintrag(zeichen=3301, gesamt_ms=1000),
+             eintrag(zeichen=60000, gesamt_ms=9000))
+
+    k = auswerten(pfad, "30t", jetzt=JETZT)["laengenklassen"]
+
+    assert k == [
+        {"label": "≤ 1 Seite", "bis_zeichen": 3300, "anzahl": 2, "median_ms": 100, "p90_ms": 300},
+        {"label": "1–3 Seiten", "bis_zeichen": 9900, "anzahl": 1, "median_ms": 1000, "p90_ms": 1000},
+        {"label": "3–7 Seiten", "bis_zeichen": 23100, "anzahl": 0, "median_ms": None, "p90_ms": None},
+        {"label": "7–15 Seiten", "bis_zeichen": 49500, "anzahl": 0, "median_ms": None, "p90_ms": None},
+        {"label": "> 15 Seiten", "bis_zeichen": None, "anzahl": 1, "median_ms": 9000, "p90_ms": 9000},
+    ]
+
+
+def test_scatter_has_one_point_per_request_with_build(tmp_path):
+    pfad = tmp_path / "requests.jsonl"
+    schreibe(pfad,
+             eintrag(zeichen=500, gesamt_ms=700),
+             eintrag(zeichen=900, gesamt_ms=1100, build={"number": None, "commit": "abc1234", "dirty": True}),
+             eintrag(quelle="kalibrierung"))
+
+    s = auswerten(pfad, "30t", jetzt=JETZT)["streuung"]
+
+    assert s == [[500, 700, "#37 · 0d15b11"], [900, 1100, "#? · abc1234*"]]
+
+
+def test_usage_by_day_and_hour_in_berlin_time(tmp_path):
+    pfad = tmp_path / "requests.jsonl"
+    schreibe(pfad,
+             eintrag("2026-10-03T12:00:00+00:00"),
+             eintrag("2026-10-05T22:30:00+00:00"),  # in Berlin schon der 6., 0:30 Uhr
+             eintrag("2026-10-06T10:00:00+00:00"),
+             eintrag("2026-10-06T10:00:00+00:00", quelle="kalibrierung"))
+
+    n = auswerten(pfad, "alles", jetzt=JETZT)["nutzung"]
+
+    assert n["tage"] == [{"tag": "2026-10-03", "anzahl": 1}, {"tag": "2026-10-04", "anzahl": 0},
+                         {"tag": "2026-10-05", "anzahl": 0}, {"tag": "2026-10-06", "anzahl": 2}]
+    assert n["stunden"] == [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1] + [0] * 9
+
+
+def test_usage_uses_winter_time_and_covers_whole_period(tmp_path):
+    pfad = tmp_path / "requests.jsonl"
+    jetzt = datetime(2026, 1, 20, 12, 0, tzinfo=UTC)
+    schreibe(pfad, eintrag("2026-01-15T23:30:00+00:00"))  # Berlin: 16.01., 0:30 Uhr
+
+    n = auswerten(pfad, "7t", jetzt=jetzt)["nutzung"]
+
+    assert [t["tag"] for t in n["tage"]] == [f"2026-01-{d}" for d in range(13, 21)]
+    assert {"tag": "2026-01-16", "anzahl": 1} in n["tage"]
+    assert n["stunden"][0] == 1

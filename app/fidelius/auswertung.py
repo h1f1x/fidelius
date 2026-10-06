@@ -2,13 +2,21 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
+from zoneinfo import ZoneInfo
+
+# Das Log bleibt in UTC; Tage und Stunden zählen so, wie die Nutzer sie erleben.
+BERLIN = ZoneInfo("Europe/Berlin")
 
 ZEITRAEUME = {"24h": timedelta(hours=24), "7t": timedelta(days=7), "30t": timedelta(days=30),
               "alles": None}
 # Laut Spec nur bei den kurzen Zeiträumen ein Vergleich mit der gleich langen Vorperiode.
 MIT_VERGLEICH = {"24h", "7t"}
+BALKEN = 24
+SEITE = 3300  # Zeichen, wie die Seitenangabe in der Haupt-UI
+LAENGENKLASSEN = [("≤ 1 Seite", SEITE), ("1–3 Seiten", 3 * SEITE), ("3–7 Seiten", 7 * SEITE),
+                  ("7–15 Seiten", 15 * SEITE), ("> 15 Seiten", None)]
 
 
 def lesen(pfad: Path) -> tuple[list[dict], int, int]:
@@ -59,7 +67,59 @@ def auswerten(pfad: str | Path, zeitraum: str, jetzt: datetime | None = None) ->
         "kennzahlen": _kennzahlen(anfragen),
         "vorperiode": _kennzahlen(vorher) if vorher else None,
         "phasen": _phasen(anfragen),
+        "histogramm": _histogramm([e["gesamt_ms"] for e in anfragen]),
+        "laengenklassen": _laengenklassen(anfragen),
+        "streuung": [[e["zeichen"], e["gesamt_ms"], build_name(e.get("build"))] for e in anfragen],
+        "nutzung": _nutzung(anfragen, None if dauer is None else jetzt - dauer, jetzt),
     }
+
+
+def _nutzung(anfragen: list[dict], anfang: datetime | None, ende: datetime) -> dict:
+    """Tage lückenlos vom Anfang des Zeitraums (bei „alles“: erste Anfrage) bis heute, in Berliner Zeit."""
+    tage: dict[date, int] = {}
+    stunden = [0] * 24
+    for e in anfragen:
+        t = e["_t"].astimezone(BERLIN)
+        tage[t.date()] = tage.get(t.date(), 0) + 1
+        stunden[t.hour] += 1
+    if anfang is None:
+        if not tage:
+            return {"tage": [], "stunden": stunden}
+        erster, letzter = min(tage), max(tage)
+    else:
+        erster, letzter = anfang.astimezone(BERLIN).date(), ende.astimezone(BERLIN).date()
+    alle_tage = [erster + timedelta(days=i) for i in range((letzter - erster).days + 1)]
+    return {"tage": [{"tag": d.isoformat(), "anzahl": tage.get(d, 0)} for d in alle_tage],
+            "stunden": stunden}
+
+
+def build_name(b) -> str:
+    if not isinstance(b, dict):
+        return "unbekannt"
+    nummer = b.get("number")
+    return f"#{'?' if nummer is None else nummer} · {b.get('commit') or '?'}{'*' if b.get('dirty') else ''}"
+
+
+def _histogramm(werte: list) -> dict:
+    """Bis p99, damit einzelne Ausreißer die Skala nicht stauchen; sie zählen im letzten Balken."""
+    bis = perzentil(werte, 99)
+    if not bis:
+        return {"bis_ms": bis, "breite_ms": None, "anzahl": [len(werte)] if werte else []}
+    breite = bis / BALKEN
+    anzahl = [0] * BALKEN
+    for v in werte:
+        anzahl[min(BALKEN - 1, int(v / breite))] += 1
+    return {"bis_ms": bis, "breite_ms": breite, "anzahl": anzahl}
+
+
+def _laengenklassen(anfragen: list[dict]) -> list[dict]:
+    klassen = [{"label": label, "bis_zeichen": bis, "werte": []} for label, bis in LAENGENKLASSEN]
+    for e in anfragen:
+        k = next(k for k in klassen if k["bis_zeichen"] is None or e["zeichen"] <= k["bis_zeichen"])
+        k["werte"].append(e["gesamt_ms"])
+    return [{"label": k["label"], "bis_zeichen": k["bis_zeichen"], "anzahl": len(k["werte"]),
+             "median_ms": perzentil(k["werte"], 50), "p90_ms": perzentil(k["werte"], 90)}
+            for k in klassen]
 
 
 def _erkennung_lief(e: dict) -> bool:
