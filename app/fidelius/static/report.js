@@ -173,7 +173,8 @@
 
   function logLine(log) {
     const parts = [`${integer(log.lines)} Zeilen`];
-    if (log.broken) parts.push(`<span class="worse">${integer(log.broken)} kaputte Zeilen übersprungen</span>`);
+    // Immer sichtbar, auch bei 0: So ist erkennbar, dass kaputte Zeilen geprüft wurden.
+    parts.push(`<span class="${log.broken ? "worse" : "muted"}">${integer(log.broken)} kaputte Zeilen übersprungen</span>`);
     parts.push(`<a href="/api/request-log" download="requests.jsonl">Rohlog laden</a>`);
     return parts.join(" · ");
   }
