@@ -186,3 +186,66 @@ def test_usage_uses_winter_time_and_covers_whole_period(tmp_path):
     assert [t["tag"] for t in n["tage"]] == [f"2026-01-{d}" for d in range(13, 21)]
     assert {"tag": "2026-01-16", "anzahl": 1} in n["tage"]
     assert n["stunden"][0] == 1
+
+
+def build(nummer, commit="c0ffee0", dirty=False) -> dict:
+    return {"version": "0.1.0", "number": nummer, "commit": commit, "dirty": dirty, "time": None}
+
+
+def test_builds_compare_per_1000_chars_with_predecessor(tmp_path):
+    pfad = tmp_path / "requests.jsonl"
+    schreibe(pfad,
+             eintrag("2026-10-01T08:00:00+00:00", build=build(36), zeichen=1000, gesamt_ms=2000),
+             eintrag("2026-10-01T09:00:00+00:00", build=build(36), zeichen=1000, gesamt_ms=1000),
+             eintrag("2026-10-02T08:00:00+00:00", build=build(36), quelle="kalibrierung"),
+             eintrag("2026-10-03T08:00:00+00:00", build=build(37), zeichen=2000, gesamt_ms=1500),
+             eintrag("2026-10-04T08:00:00+00:00", build=build(38, dirty=True), quelle="kalibrierung"),
+             eintrag("2026-10-05T08:00:00+00:00", build=build(39), zeichen=1000, gesamt_ms=900))
+
+    b = auswerten(pfad, "30t", jetzt=JETZT)["builds"]
+
+    assert b[0] == {"name": "#36 · c0ffee0", "nummer": 36, "commit": "c0ffee0", "dirty": False,
+                    "erste": "2026-10-01T10:00:00+02:00", "letzte": "2026-10-02T10:00:00+02:00",
+                    "anfragen": 2, "median_ms": 1000, "p90_ms": 2000, "je_1000_median_ms": 1000.0,
+                    "abweichung_vorgaenger": None}
+    assert [x["name"] for x in b] == ["#36 · c0ffee0", "#37 · c0ffee0", "#38 · c0ffee0*",
+                                      "#39 · c0ffee0"]
+    assert [x["abweichung_vorgaenger"] for x in b] == [None, -0.25, None, 0.2]  # #38 hat keine Anfragen
+
+
+def test_calibration_table_by_build_and_text_length(tmp_path):
+    pfad = tmp_path / "requests.jsonl"
+    kalib = {"quelle": "kalibrierung"}
+    schreibe(pfad,
+             *[eintrag(build=build(36), zeichen=515, gesamt_ms=ms, **kalib) for ms in (100, 300, 200)],
+             eintrag(build=build(36), zeichen=7839, gesamt_ms=900, **kalib),
+             eintrag(build=build(37), zeichen=1000, gesamt_ms=5000),  # Anfrage, keine Kalibrierung
+             eintrag(build=build(38), zeichen=515, gesamt_ms=150, **kalib),
+             eintrag(build=build(38), zeichen=1383, gesamt_ms=400, **kalib))
+
+    k = auswerten(pfad, "30t", jetzt=JETZT)["kalibrierung"]
+
+    assert k == {"texte": [515, 1383, 7839], "zeilen": [
+        {"build": "#36 · c0ffee0", "laeufe": 4, "median_ms": [200, None, 900]},
+        {"build": "#38 · c0ffee0", "laeufe": 2, "median_ms": [150, 400, None]},
+    ]}
+
+
+def test_errors_grouped_by_text_with_last_occurrence(tmp_path):
+    pfad = tmp_path / "requests.jsonl"
+    weg = "Laya nicht erreichbar (ConnectError); Gate übersprungen."
+    zeit = " Laya-Bestätigung fehlgeschlagen (ReadTimeout)."
+    schreibe(pfad,
+             eintrag("2026-10-02T08:00:00+00:00", fehler=zeit),
+             eintrag("2026-10-03T08:00:00+00:00", fehler=weg),
+             eintrag("2026-10-04T08:00:00+00:00", fehler=weg, gesamt_ms=30),
+             eintrag("2026-10-01T08:00:00+00:00", fehler=weg),
+             eintrag("2026-10-05T08:00:00+00:00", fehler=weg, quelle="kalibrierung"))
+
+    a = auswerten(pfad, "30t", jetzt=JETZT)
+
+    assert a["fehler"] == [
+        {"text": weg, "anzahl": 3, "zuletzt": "2026-10-04T10:00:00+02:00"},
+        {"text": zeit.strip(), "anzahl": 1, "zuletzt": "2026-10-02T10:00:00+02:00"},
+    ]
+    assert a["phasen"]["gesamt"]["anzahl"] == 4  # Fehlschläge sind erlebte Laufzeit

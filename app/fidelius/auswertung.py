@@ -71,7 +71,68 @@ def auswerten(pfad: str | Path, zeitraum: str, jetzt: datetime | None = None) ->
         "laengenklassen": _laengenklassen(anfragen),
         "streuung": [[e["zeichen"], e["gesamt_ms"], build_name(e.get("build"))] for e in anfragen],
         "nutzung": _nutzung(anfragen, None if dauer is None else jetzt - dauer, jetzt),
+        "builds": _builds(drin),
+        "kalibrierung": _kalibrierung(drin),
+        "fehler": _fehler(anfragen),
     }
+
+
+def _fehler(anfragen: list[dict]) -> list[dict]:
+    # strip: pipeline.analyze hängt den Hinweis zur Laya-Bestätigung mit führendem Leerzeichen an.
+    gruppen: dict[str, list[datetime]] = {}
+    for e in anfragen:
+        if e.get("fehler"):
+            gruppen.setdefault(str(e["fehler"]).strip(), []).append(e["_t"])
+    liste = [{"text": text, "anzahl": len(zeiten), "zuletzt": _berlin(max(zeiten))}
+             for text, zeiten in gruppen.items()]
+    return sorted(liste, key=lambda f: (-f["anzahl"], f["text"]))
+
+
+def _berlin(t: datetime) -> str:
+    return t.astimezone(BERLIN).isoformat()
+
+
+def _nach_build(eintraege: list[dict]) -> dict[str, list[dict]]:
+    """Gruppiert nach Build, in der Reihenfolge, in der die Builds zuerst auftauchen."""
+    gruppen: dict[str, list[dict]] = {}
+    for e in sorted(eintraege, key=lambda e: e["_t"]):
+        gruppen.setdefault(build_name(e.get("build")), []).append(e)
+    return gruppen
+
+
+def _builds(eintraege: list[dict]) -> list[dict]:
+    """Verglichen wird je 1.000 Zeichen: Die Texte sind unterschiedlich lang, die reine Gesamtzeit
+    würde Builds mit kürzeren Texten bevorzugen. Vorgänger ist der letzte Build mit Anfragen."""
+    zeilen, vorgaenger = [], None
+    for name, gruppe in _nach_build(eintraege).items():
+        b = gruppe[0].get("build") if isinstance(gruppe[0].get("build"), dict) else {}
+        k = _kennzahlen(_anfragen(gruppe))
+        je_1000 = k["je_1000_median_ms"]
+        abweichung = None
+        if je_1000 is not None and vorgaenger:
+            abweichung = round((je_1000 - vorgaenger) / vorgaenger, 4)
+        if je_1000 is not None:
+            vorgaenger = je_1000
+        zeilen.append({
+            "name": name, "nummer": b.get("number"), "commit": b.get("commit"),
+            "dirty": bool(b.get("dirty")),
+            "erste": _berlin(gruppe[0]["_t"]), "letzte": _berlin(gruppe[-1]["_t"]),
+            "anfragen": k["anfragen"], "median_ms": k["gesamt_median_ms"],
+            "p90_ms": k["gesamt_p90_ms"], "je_1000_median_ms": je_1000,
+            "abweichung_vorgaenger": abweichung,
+        })
+    return zeilen
+
+
+def _kalibrierung(eintraege: list[dict]) -> dict:
+    """Gleiche Texte machen Builds direkt vergleichbar; der Text ist an seiner Zeichenzahl kenntlich."""
+    kalib = [e for e in eintraege if e.get("quelle") == "kalibrierung"]
+    texte = sorted({e["zeichen"] for e in kalib})
+    zeilen = []
+    for name, gruppe in _nach_build(kalib).items():
+        median = [perzentil([e["gesamt_ms"] for e in gruppe if e["zeichen"] == z], 50) for z in texte]
+        zeilen.append({"build": name, "laeufe": len(gruppe), "median_ms": median})
+    return {"texte": texte, "zeilen": zeilen}
 
 
 def _nutzung(anfragen: list[dict], anfang: datetime | None, ende: datetime) -> dict:
