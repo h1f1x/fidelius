@@ -253,3 +253,21 @@ def test_errors_grouped_by_text_with_last_occurrence(tmp_path):
         {"text": timeout.strip(), "count": 1, "last": "2026-10-02T10:00:00+02:00"},
     ]
     assert result["phases"]["total"]["count"] == 4  # Fehlschläge sind erlebte Laufzeit
+
+
+def test_predecessor_comes_from_whole_log(tmp_path):
+    path = tmp_path / "requests.jsonl"
+    write_log(path,
+              entry("2026-09-10T08:00:00+00:00", build=build(35), zeichen=1000, gesamt_ms=800),
+              entry("2026-09-20T08:00:00+00:00", build=build(36), zeichen=1000, gesamt_ms=2000),
+              entry("2026-09-21T08:00:00+00:00", build=build(36), zeichen=1000, gesamt_ms=2000),
+              entry("2026-10-01T08:00:00+00:00", build=build(36), zeichen=1000, gesamt_ms=1000),
+              entry("2026-10-03T08:00:00+00:00", build=build(37), zeichen=1000, gesamt_ms=1500))
+
+    builds = report(path, "7d", now=NOW)["builds"]
+
+    # #36 vergleicht mit #35 außerhalb des Zeitraums, #37 mit dem Wert von #36 über das ganze
+    # Log (2.000 ms je 1.000 Zeichen), nicht nur mit dem im Zeitraum (1.000 ms).
+    assert [b["name"] for b in builds] == ["#36 · c0ffee0", "#37 · c0ffee0"]
+    assert [b["per_1000_median_ms"] for b in builds] == [1000.0, 1500.0]
+    assert [b["change_vs_previous"] for b in builds] == [0.25, -0.25]

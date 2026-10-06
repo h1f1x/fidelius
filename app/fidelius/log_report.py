@@ -27,7 +27,8 @@ Antwort von report() bzw. GET /api/report?period=24h|7d|30d|all (Standard 30d):
     builds          [{name, number, commit, dirty, first, last, requests, median_ms, p90_ms,
                      per_1000_median_ms, change_vs_previous}], sortiert nach erstem Auftauchen;
                     name z. B. "#37 · 0d15b11" („*“ = dirty); first/last inkl. Kalibrierung;
-                    change_vs_previous je 1.000 Zeichen zum letzten Build mit Anfragen
+                    change_vs_previous je 1.000 Zeichen zum letzten Build mit Anfragen davor,
+                    bestimmt über das ganze Log, auch außerhalb des Zeitraums
                     (0.2 = 20 % langsamer, negativ = schneller)
     calibration     {texts: [Zeichenzahlen], rows: [{build, runs, median_ms: [je Text]}]}
     errors          [{text, count, last}], häufigste zuerst
@@ -75,7 +76,7 @@ def report(path: str | Path, period: str, now: datetime | None = None) -> dict:
         "length_classes": _length_classes(requests),
         "scatter": [[e["zeichen"], e["gesamt_ms"], _build_name(e.get("build"))] for e in requests],
         "usage": _usage(requests, None if duration is None else now - duration, now),
-        "builds": _builds(in_period),
+        "builds": _builds(in_period, entries),
         "calibration": _calibration(in_period),
         "errors": _errors(requests),
     }
@@ -214,19 +215,21 @@ def _usage(requests: list[dict], start: datetime | None, end: datetime) -> dict:
 
 # ---------- builds ----------
 
-def _builds(entries: list[dict]) -> list[dict]:
+def _builds(in_period: list[dict], entries: list[dict]) -> list[dict]:
     """Verglichen wird je 1.000 Zeichen: Die Texte sind unterschiedlich lang, die reine Gesamtzeit
-    würde Builds mit kürzeren Texten bevorzugen. Vorgänger ist der letzte Build mit Anfragen."""
-    rows, previous = [], None
-    for name, group in _by_build(entries).items():
+    würde Builds mit kürzeren Texten bevorzugen. Vorgänger ist der letzte Build mit Anfragen davor,
+    bestimmt über das ganze Log, samt seinem Wert. Sonst hätte der erste Build im Zeitraum nie
+    einen Vergleich."""
+    predecessor = _predecessor_per_1000(entries)
+    rows = []
+    for name, group in _by_build(in_period).items():
         info = group[0].get("build") if isinstance(group[0].get("build"), dict) else {}
         metrics = _metrics(_requests(group))
         per_1000 = metrics["per_1000_median_ms"]
+        previous = predecessor.get(name)
         change = None
         if per_1000 is not None and previous:
             change = round((per_1000 - previous) / previous, 4)
-        if per_1000 is not None:
-            previous = per_1000
         rows.append({
             "name": name, "number": info.get("number"), "commit": info.get("commit"),
             "dirty": bool(info.get("dirty")),
@@ -236,6 +239,17 @@ def _builds(entries: list[dict]) -> list[dict]:
             "change_vs_previous": change,
         })
     return rows
+
+
+def _predecessor_per_1000(entries: list[dict]) -> dict[str, float | None]:
+    """Je Build der Median je 1.000 Zeichen seines Vorgängers über das ganze Log, None ohne."""
+    result, previous = {}, None
+    for name, group in _by_build(entries).items():
+        result[name] = previous
+        per_1000 = _metrics(_requests(group))["per_1000_median_ms"]
+        if per_1000 is not None:
+            previous = per_1000
+    return result
 
 
 def _by_build(entries: list[dict]) -> dict[str, list[dict]]:
