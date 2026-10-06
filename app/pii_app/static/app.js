@@ -40,8 +40,8 @@
   async function copy(text, msg) { try { await navigator.clipboard.writeText(text); toast(msg); return true; } catch { toast("Kopieren nicht möglich, bitte Text manuell markieren."); return false; } }
   function save() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {} }
   function load() { try { const s = JSON.parse(localStorage.getItem(STORAGE_KEY)); if (s && s.text) state = s; } catch {} }
-  async function api(path, body) {
-    const r = await fetch(path, body ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : {});
+  async function api(path, body, signal) {
+    const r = await fetch(path, { ...(body ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : {}), signal });
     if (!r.ok) throw Object.assign(new Error((await r.json().catch(() => ({}))).detail || r.statusText), { status: r.status });
     return r.json();
   }
@@ -107,7 +107,11 @@
     $("run").disabled = true; $("force").disabled = true;
     // Die Kalibrierung läuft nach dem Start im Hintergrund. Wer die Seite vorher geöffnet hat, soll den
     // Balken trotzdem bekommen, sobald sie fertig ist.
-    if (!CONFIG.calibration) { try { CONFIG = await api("/api/config"); } catch {} }
+    // Hängt der Server, startet die Prüfung nach wenigen Sekunden trotzdem, mit der alten Config.
+    if (!CONFIG.calibration) {
+      const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 3000);
+      try { CONFIG = await api("/api/config", null, ctl.signal); } catch {} finally { clearTimeout(timer); }
+    }
     const estimate = estimateMs(CONFIG.calibration, text.length), bar = $("progress");
     bar.value = 0; bar.classList.toggle("hidden", estimate == null);
     const t0 = performance.now(), tick = () => {
