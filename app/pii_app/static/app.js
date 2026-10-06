@@ -17,6 +17,9 @@
   const color = (cat) => (CONFIG.categories[cat] || {}).color || "#999";
   const label = (cat) => (CONFIG.categories[cat] || {}).label || cat;
   function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.remove("hidden"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.add("hidden"), 1800); }
+  // Eine A4-Seite Fließtext, wie man sie aus Word kennt. Zeichen allein sagen Laien wenig.
+  const PAGE_CHARS = 3300;
+  const pages = (chars) => { const n = Math.max(1, Math.round(chars / PAGE_CHARS)); return `etwa ${n.toLocaleString("de-DE")} ${n === 1 ? "Seite" : "Seiten"}`; };
   const secs = (ms) => (ms / 1000).toLocaleString("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " s";
   function showError(msg) { const e = $("error"); if (!msg) { e.classList.add("hidden"); return; } e.textContent = msg; e.classList.remove("hidden"); }
   async function copy(text, msg) { try { await navigator.clipboard.writeText(text); toast(msg); return true; } catch { toast("Kopieren nicht möglich, bitte Text manuell markieren."); return false; } }
@@ -39,6 +42,7 @@
       return;
     }
     renderVersion(CONFIG.build);
+    renderLimit();
     $("threshold").value = CONFIG.gate_threshold; $("thresholdValue").textContent = Number(CONFIG.gate_threshold).toFixed(2);
     try {
       const ex = await api("/api/examples");
@@ -62,6 +66,11 @@
     const when = b.time ? " · gebaut " + new Date(b.time).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" }) : "";
     $("version").textContent = `v${b.version} · ${build}${when}`;
   }
+  // Die Grenze kommt vom Server, damit sie nach einer Änderung von MAX_TEXT_CHARS weiter stimmt.
+  function renderLimit() {
+    for (const el of document.querySelectorAll(".maxpages")) el.textContent = pages(CONFIG.max_text_chars);
+    $("pageChars").textContent = PAGE_CHARS.toLocaleString("de-DE");
+  }
   function setExpert(on) {
     document.body.classList.toggle("expert", on);
     $("expertMode").checked = on;
@@ -83,8 +92,10 @@
       save(); render();
       showError(null);
     } catch (e) {
-      // Zu langer Text: Wiederholen hilft nicht, nur Kürzen.
-      showError(e.status === 413 ? e.message + ". Bitte den Text kürzen."
+      // Zu langer Text: Wiederholen hilft nicht, nur Kürzen. Beim Analysieren heißt 413 immer zu langer
+      // Text, ob über die Textgrenze oder die Body-Grenze; die Meldung nennt deshalb die Seiten statt
+      // des Server-Texts mit seinen Zeichenzahlen.
+      showError(e.status === 413 ? `Der Text ist zu lang, möglich sind höchstens ${pages(CONFIG.max_text_chars)}. Bitte den Text kürzen.`
         : "Die Prüfung ist fehlgeschlagen: " + e.message + ". Bitte noch einmal versuchen.");
     }
     finally { clearInterval(clock); $("run").disabled = false; $("force").disabled = false; renderElapsed(); }

@@ -67,6 +67,7 @@ def get_config() -> dict:
         "gate_threshold": config.GATE_THRESHOLD,
         "laya_reject_threshold": config.LAYA_REJECT_THRESHOLD,
         "laya_checked_categories": sorted(config.LAYA_CHECKED_CATEGORIES),
+        "max_text_chars": config.MAX_TEXT_CHARS,
         "build": build_info.build(),
     }
 
