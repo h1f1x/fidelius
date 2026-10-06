@@ -3,9 +3,11 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor
 
 from . import config
+from .detectors.base import RawHit
 from .detectors.gliner import detect_gliner
 from .detectors.regex_det import detect_regex
 from .detectors.spacy_det import detect_spacy
@@ -16,14 +18,21 @@ from .placeholders import anonymize, assign_placeholders, build_mapping
 
 log = logging.getLogger(__name__)
 
+Detector = Callable[[str], list[RawHit]]
+DEFAULT_DETECTORS: tuple[Detector, ...] = (detect_gliner, detect_spacy, detect_regex)
+
 
 class Pipeline:
-    def __init__(self, laya: LayaClient | None = None):
+    def __init__(self, laya: LayaClient | None = None,
+                 detectors: Sequence[Detector] = DEFAULT_DETECTORS,
+                 clock: Callable[[], float] = time.perf_counter):
         self.laya = laya or LayaClient()
-        self.pool = ThreadPoolExecutor(max_workers=3)
+        self.clock = clock
+        self.detectors = tuple(detectors)
+        self.pool = ThreadPoolExecutor(max_workers=max(len(self.detectors), 1))
 
     def analyze(self, req: AnalyzeRequest) -> AnalyzeResponse:
-        t0 = time.perf_counter()
+        t0 = self.clock()
         timing = Timing()
         text = req.text
         allowed = set(req.categories) if req.categories else set(config.CATEGORIES)
@@ -37,7 +46,7 @@ class Pipeline:
         except Exception as exc:  # Laya nicht erreichbar: Erkennung trotzdem erlauben
             log.warning("Laya-Gate fehlgeschlagen: %s", exc)
             gate_note = f"Laya nicht erreichbar ({exc.__class__.__name__}); Gate übersprungen."
-        timing.gate_ms = _ms(t0)
+        timing.gate_ms = self._ms(t0)
         sensitive = prob is None or prob >= threshold
         gate = Gate(probability=prob, threshold=threshold, sensitive=sensitive,
                     skipped=req.force, note=gate_note)
@@ -45,29 +54,27 @@ class Pipeline:
         entities: list[Entity] = []
         if sensitive or req.force:
             # 2. Erkennung parallel
-            t1 = time.perf_counter()
-            futs = [self.pool.submit(detect_gliner, text),
-                    self.pool.submit(detect_spacy, text),
-                    self.pool.submit(detect_regex, text)]
+            t1 = self.clock()
+            futs = [self.pool.submit(detect, text) for detect in self.detectors]
             hits = [h for f in futs for h in f.result()]
             # 3. Zusammenführen
             entities = merge_hits(hits, text, allowed)
-            timing.detect_ms = _ms(t1)
+            timing.detect_ms = self._ms(t1)
             # 4. Laya-Bestätigung
             if req.use_laya_check and gate_note is None:
-                t2 = time.perf_counter()
+                t2 = self.clock()
                 try:
                     entities = self.laya.classify(text, entities)
                 except Exception as exc:
                     log.warning("Laya-Bestätigung fehlgeschlagen: %s", exc)
                     gate.note = (gate.note or "") + f" Laya-Bestätigung fehlgeschlagen ({exc.__class__.__name__})."
-                timing.laya_check_ms = _ms(t2)
+                timing.laya_check_ms = self._ms(t2)
             # Abgewählte Kategorien nach Umkategorisierung erneut filtern
             entities = [e if e.category in allowed else e.model_copy(update={"status": "rejected_user"})
                         for e in entities]
         # 5. Platzhalter
         entities = assign_placeholders(entities)
-        timing.total_ms = _ms(t0)
+        timing.total_ms = self._ms(t0)
         return AnalyzeResponse(
             text=text, gate=gate, entities=entities,
             anonymized_text=anonymize(text, entities),
@@ -78,6 +85,5 @@ class Pipeline:
         entities = assign_placeholders(entities)
         return entities, anonymize(text, entities), build_mapping(entities)
 
-
-def _ms(t: float) -> int:
-    return int((time.perf_counter() - t) * 1000)
+    def _ms(self, t: float) -> int:
+        return int((self.clock() - t) * 1000)
