@@ -12,8 +12,8 @@ from .pipeline import Pipeline
 
 log = logging.getLogger(__name__)
 
-SHORT = "04_terminabsprache_harmlos"
-MEDIUM = "06_mailkette_varianten"
+SHORT_EXAMPLE = "04_terminabsprache_harmlos"
+MEDIUM_EXAMPLE = "06_mailkette_varianten"
 
 
 @dataclass(frozen=True)
@@ -71,8 +71,8 @@ class Calibration:
         def read(p: Path) -> str:
             return p.read_text(encoding="utf-8")
         everything = "\n\n".join(read(p) for p in sorted(self.examples_dir.glob("*.txt")))
-        return [read(self.examples_dir / f"{SHORT}.txt"),
-                read(self.examples_dir / f"{MEDIUM}.txt"),
+        return [read(self.examples_dir / f"{SHORT_EXAMPLE}.txt"),
+                read(self.examples_dir / f"{MEDIUM_EXAMPLE}.txt"),
                 everything]
 
     def _measure(self, text: str) -> int | None:
