@@ -41,6 +41,10 @@ GLINER_LABELS: dict[str, str] = {
 }
 GLINER_MODEL = "fastino/gliner2-privacy-filter-PII-multi"
 GLINER_THRESHOLD = float(os.environ.get("GLINER_THRESHOLD", "0.5"))
+# GLiNER2 bekommt den Text in Fenstern: Sein Speicher wächst überlinear mit der Länge, ab ~6.000
+# Zeichen um Gigabytes (#9). Die Überlappung fasst Namen, die auf einer Fenstergrenze liegen.
+GLINER_WINDOW_CHARS = 2000
+GLINER_WINDOW_OVERLAP = 200
 
 # spaCy de_core_news_lg: PER, LOC, ORG, MISC. MISC wird ignoriert.
 SPACY_LABELS: dict[str, str] = {"PER": "PERSON", "LOC": "ORT", "ORG": "ORG"}
