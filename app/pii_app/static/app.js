@@ -23,13 +23,18 @@
   const num = (x, opts) => x.toLocaleString("de-DE", opts);
   const pages = (chars) => { const n = Math.max(1, Math.round(chars / PAGE_CHARS)); return `etwa ${num(n)} ${n === 1 ? "Seite" : "Seiten"}`; };
   const secs = (ms) => num(ms / 1000, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " s";
-  // Geschätzte Dauer einer Prüfung; null ohne Kalibrierung, dann gibt es keinen Balken.
-  const estimateMs = (c, chars) => c ? c.base_ms + c.rate_ms_per_char * chars : null;
+  // Geschätzte Dauer einer Prüfung; null ohne Kalibrierung, dann gibt es keinen Balken. Eine Schätzung
+  // von null oder weniger taugt nicht als Nenner und gilt wie keine.
+  const estimateMs = (c, chars) => { const ms = c ? c.base_ms + c.rate_ms_per_char * chars : NaN; return ms > 0 ? ms : null; };
   // Ist und Schätzung statt Countdown: ein falscher Countdown ärgert mehr als eine ehrliche Angabe.
   // Der Balken hält bei 95 %, damit er nie „fertig“ zeigt, solange die Antwort noch fehlt.
+  // „Länger als geschätzt“ vergleicht die angezeigten ganzen Sekunden, sonst stünde dort „7 s von ca. 7 s,
+  // dauert länger als geschätzt“.
   function progress(elapsed, estimate) {
-    const text = `Prüfe … ${num(Math.floor(elapsed / 1000))} s von ca. ${num(Math.max(1, Math.round(estimate / 1000)))} s`;
-    return { percent: Math.round(Math.min(95, 100 * elapsed / estimate)), text: elapsed > estimate ? text + ", dauert länger als geschätzt" : text };
+    const shown = Math.floor(elapsed / 1000), expected = Math.max(1, Math.round(estimate / 1000));
+    const text = `Prüfe … ${num(shown)} s von ca. ${num(expected)} s`;
+    const percent = estimate > 0 ? Math.round(Math.min(95, 100 * elapsed / estimate)) : 95;
+    return { percent, text: shown > expected ? text + ", dauert länger als geschätzt" : text };
   }
   function showError(msg) { const e = $("error"); if (!msg) { e.classList.add("hidden"); return; } e.textContent = msg; e.classList.remove("hidden"); }
   async function copy(text, msg) { try { await navigator.clipboard.writeText(text); toast(msg); return true; } catch { toast("Kopieren nicht möglich, bitte Text manuell markieren."); return false; } }
