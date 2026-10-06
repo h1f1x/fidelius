@@ -4,8 +4,8 @@ Stand: 2026-10-06, Ergebnis einer Klärungsrunde. Alle Punkte sind entschieden, 
 
 ## Ausgangslage
 
-- Die Textgrenze steht als `MAX_TEXT_CHARS = 50000` in `app/pii_app/config.py` und lässt sich per Env überschreiben. Ein zu langer Text bekommt einen 413 mit Zeichenzahl. Die UI nennt die Grenze vorher nirgends.
-- Während der Prüfung zeigt die UI „Prüfe … X s“, danach „Geprüft in X s“ (`app/pii_app/static/app.js`). Wie lange es ungefähr dauern wird, erfährt man nicht.
+- Die Textgrenze steht als `MAX_TEXT_CHARS = 50000` in `app/fidelius/config.py` und lässt sich per Env überschreiben. Ein zu langer Text bekommt einen 413 mit Zeichenzahl. Die UI nennt die Grenze vorher nirgends.
+- Während der Prüfung zeigt die UI „Prüfe … X s“, danach „Geprüft in X s“ (`app/fidelius/static/app.js`). Wie lange es ungefähr dauern wird, erfährt man nicht.
 - Die Dauer ist nicht rein linear in der Zeichenzahl:
   - Das Gate teilt den Text in Abschnitte zu 600 Zeichen, seine Dauer wächst also linear.
   - Die Laya-Bestätigung wächst mit der Zahl der Treffer (Batches zu 64).
@@ -66,7 +66,7 @@ Stand: 2026-10-06, Ergebnis einer Klärungsrunde. Alle Punkte sind entschieden, 
     - Zahl der Treffer, die Laya abgelehnt hat
   - Fehlerhinweis, falls Laya nicht erreichbar war
 - **Was nie hineinkommt:** Text, Trefferwerte, Platzhaltertabelle, IP-Adresse. Das hält das Versprechen der Infobox, dass der Text nirgends hingeht.
-- **Ablage:** `/var/log/pii-app/requests.jsonl` auf einem benannten Volume. Die Datei überdauert so Deploys, `docker logs` würde das nicht.
+- **Ablage:** `/var/log/fidelius/requests.jsonl` auf einem benannten Volume. Die Datei überdauert so Deploys, `docker logs` würde das nicht.
 - **Aufbewahrung:** unbegrenzt, ohne Rotation. Ein Eintrag hat ~300 Byte, 10.000 Anfragen ergeben also ~3 MB.
 
 ## Tickets nach der Umsetzung
