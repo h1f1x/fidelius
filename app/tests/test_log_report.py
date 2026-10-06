@@ -117,6 +117,42 @@ def test_phases_count_only_requests_where_they_ran(tmp_path):
     }
 
 
+def test_phase_bar_is_scaled_to_sum_when_phases_exceed_total_median(tmp_path):
+    path = tmp_path / "requests.jsonl"
+    write_log(path,
+              entry(gate_ms=100, erkennung_ms=0, laya_ms=0, gesamt_ms=200),  # harmlos
+              entry(gate_ms=100, erkennung_ms=0, laya_ms=0, gesamt_ms=200),  # harmlos
+              entry(sensibel=True, gate_wert=0.9, gate_ms=200, erkennung_ms=300, laya_ms=100,
+                    gesamt_ms=1000))
+
+    bar = report(path, "30d", now=NOW)["phase_bar"]
+
+    # Gesamtmedian 200 ms; die Phasen-Mediane (100 + 300 + 100) stammen aus verschieden großen
+    # Mengen und übersteigen ihn, deshalb normiert der Balken auf ihre Summe, ohne Rest.
+    assert bar == [{"phase": "gate", "median_ms": 100, "share": 0.2},
+                   {"phase": "detection", "median_ms": 300, "share": 0.6},
+                   {"phase": "laya", "median_ms": 100, "share": 0.2},
+                   {"phase": "other", "median_ms": 0, "share": 0.0}]
+
+
+def test_phase_bar_shows_rest_up_to_total_median(tmp_path):
+    path = tmp_path / "requests.jsonl"
+    write_log(path,
+              entry(sensibel=True, gate_wert=0.9, gate_ms=200, erkennung_ms=300, laya_ms=100,
+                    gesamt_ms=1000))
+
+    bar = report(path, "30d", now=NOW)["phase_bar"]
+
+    assert bar == [{"phase": "gate", "median_ms": 200, "share": 0.2},
+                   {"phase": "detection", "median_ms": 300, "share": 0.3},
+                   {"phase": "laya", "median_ms": 100, "share": 0.1},
+                   {"phase": "other", "median_ms": 400, "share": 0.4}]
+
+
+def test_phase_bar_is_empty_without_requests(tmp_path):
+    assert report(tmp_path / "requests.jsonl", "30d", now=NOW)["phase_bar"] == []
+
+
 def test_histogram_is_cut_at_p99(tmp_path):
     path = tmp_path / "requests.jsonl"
     write_log(path, *[entry(gesamt_ms=ms) for ms in range(1, 101)])

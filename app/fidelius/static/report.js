@@ -80,20 +80,23 @@
       <p class="hint">Abgeschnitten bei p99 (${ms(upper)}), längere Anfragen zählen im letzten Balken.</p>`;
   }
 
-  function phaseBar(phases) {
-    const parts = PHASES.filter(([key]) => key !== "total").map(([key, label], i) => ({ label, i, median: phases[key]?.median_ms }));
-    const sum = parts.reduce((s, p) => s + (isNumber(p.median) ? p.median : 0), 0);
-    if (!sum) return empty();
+  // Anteile kommen fertig aus phase_bar: bezogen auf den Gesamtmedian, Rest als „übrige“.
+  const BAR_PHASES = { gate: ["Gate", 0], detection: ["Erkennung", 1], laya: ["Laya", 2], other: ["übrige", COLORS - 1] };
+
+  function phaseBar(parts) {
+    const known = (parts || []).filter((p) => BAR_PHASES[p.phase] && isNumber(p.share));
+    if (!known.some((p) => p.share > 0)) return empty();
     let x = 0;
-    const rects = parts.map((p) => {
-      const w = W * (isNumber(p.median) ? p.median : 0) / sum;
-      const s = `<rect x="${x}" y="0" width="${w}" height="22" style="fill:${color(p.i)}"><title>${p.label}: ${ms(p.median)}</title></rect>`
-        + (w > 110 ? `<text x="${x + 4}" y="34">${p.label} ${ms(p.median)}</text>` : "");
-      x += w;
-      return s;
+    const rects = known.map((p) => {
+      const [label, colorIndex] = BAR_PHASES[p.phase], width = W * p.share;
+      const rect = `<rect x="${x}" y="0" width="${width}" height="22" style="fill:${color(colorIndex)}"><title>${label}: ${ms(p.median_ms)}</title></rect>`
+        + (width > 110 ? `<text x="${x + 4}" y="34">${label} ${ms(p.median_ms)}</text>` : "");
+      x += width;
+      return rect;
     }).join("");
     return `<svg class="chart" viewBox="0 0 ${W} 38" role="img">${rects}</svg>
-      <div class="legendrow">${parts.map((p) => `<span><i style="background:${color(p.i)}"></i>${p.label}</span>`).join("")}</div>`;
+      <div class="legendrow">${known.map((p) => `<span><i style="background:${color(BAR_PHASES[p.phase][1])}"></i>${BAR_PHASES[p.phase][0]}</span>`).join("")}</div>
+      <p class="hint">Anteile am Median der Gesamtzeit. Die Phasen-Mediane stammen aus verschieden vielen Anfragen; „übrige“ ist der Rest bis zum Gesamtmedian.</p>`;
   }
 
   // Nearest-Rank wie im Backend; nur für die Achsen, damit Ausreißer die Skala nicht stauchen.
@@ -199,7 +202,7 @@
         ${tile("Anfragen pro Tag", bars(days.map((d) => ({ label: shortDay(d.day), value: d.count })), { every: Math.ceil(days.length / 15) }))}
         ${tile("Anfragen nach Uhrzeit", bars(data.usage.hours.map((n, i) => ({ label: `${i} Uhr`, short: i % 3 ? "" : String(i), value: n }))))}
         ${tile("Verteilung Gesamtzeit", histogram(data.histogram, [[metrics.total_median_ms, "Median"], [metrics.total_p90_ms, "p90"]]))}
-        ${tile("Wohin die Zeit geht (Median)", phaseBar(data.phases) + phaseTable(data.phases))}
+        ${tile("Wohin die Zeit geht (Median)", phaseBar(data.phase_bar) + phaseTable(data.phases))}
         ${tile("Textlänge und Gesamtzeit", scatter(data.scatter, data.builds))}
         ${tile("Nach Textlänge", lengthTable(data.length_classes, data.page_chars))}
         ${tile("Builds", buildTable(data.builds), true)}

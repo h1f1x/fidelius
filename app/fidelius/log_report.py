@@ -17,6 +17,9 @@ Antwort von report() bzw. GET /api/report?period=24h|7d|30d|all (Standard 30d):
                     Vorperiode keine Anfragen hat („kein Vergleich“)
     phases          {gate, detection, laya, total}, je {count, median_ms, p90_ms, p99_ms};
                     eine Phase zählt nur bei Anfragen, in denen sie lief
+    phase_bar       [{phase, median_ms, share}] für gate, detection, laya und other (Rest bis
+                    zum Gesamtmedian); share bezogen auf den Gesamtmedian, oder auf die Summe der
+                    Phasen, wenn sie ihn übersteigt (dann other = 0); [] ohne Anfragen
     histogram       {max_ms, width_ms, counts: [24 Zahlen]}; Balken i deckt
                     [i·width_ms, (i+1)·width_ms), max_ms = p99, Werte darüber zählen im letzten
     length_classes  [{label, max_chars, count, median_ms, p90_ms}], 5 Klassen à page_chars,
@@ -64,14 +67,17 @@ def report(path: str | Path, period: str, now: datetime | None = None) -> dict:
     duration = PERIODS[period]
     in_period = entries if duration is None else _between(entries, now - duration, now)
     requests = _requests(in_period)
-    before = [] if duration is None else _requests(_between(entries, now - 2 * duration, now - duration))
+    before = [] if duration is None else _requests(
+        _between(entries, now - 2 * duration, now - duration))
+    phases = _phases(requests)
     return {
         "period": period,
         "page_chars": PAGE_CHARS,
         "log": {"path": str(path), "present": lines > 0, "lines": lines, "broken": broken},
         "metrics": _metrics(requests),
         "previous": _metrics(before) if before else None,
-        "phases": _phases(requests),
+        "phases": phases,
+        "phase_bar": _phase_bar(phases),
         "histogram": _histogram([e["gesamt_ms"] for e in requests]),
         "length_classes": _length_classes(requests),
         "scatter": [[e["zeichen"], e["gesamt_ms"], _build_name(e.get("build"))] for e in requests],
@@ -159,6 +165,24 @@ def _laya_ran(e: dict) -> bool:
     # erreicht hat. Ohne Gate-Wert war Laya nicht erreichbar, die Bestätigung entfällt.
     return (_detection_ran(e) and bool(e.get("laya_bestaetigung"))
             and e.get("gate_wert") is not None)
+
+
+# ---------- phase_bar ----------
+
+def _phase_bar(phases: dict) -> list[dict]:
+    """Die Phasen-Mediane stammen aus verschieden großen Mengen (Erkennung und Laya laufen nicht
+    immer) und ergeben zusammen nicht den Gesamtmedian. Auf ihre Summe normiert, würden sie zu
+    100 % aufgeblasen; deshalb zählt der Gesamtmedian, und was fehlt, steht als „other“ da."""
+    total = phases["total"]["median_ms"]
+    if total is None:
+        return []
+    parts = [(name, phases[name]["median_ms"] or 0) for name in ("gate", "detection", "laya")]
+    known = sum(ms for _, ms in parts)
+    parts.append(("other", max(0, total - known)))
+    scale = max(total, known)
+    if not scale:
+        return []
+    return [{"phase": name, "median_ms": ms, "share": round(ms / scale, 4)} for name, ms in parts]
 
 
 # ---------- histogram ----------
