@@ -141,7 +141,7 @@
 
   function buildTable(builds) {
     if (!builds.length) return empty();
-    const rows = builds.map((b, i) => `<tr><td><i class="punkt" style="background:${color(i)}"></i>${esc(b.name)}</td>
+    const rows = builds.map((b, i) => `<tr><td><i class="dot" style="background:${color(i)}"></i>${esc(b.name)}</td>
       <td>${esc(shortDay(b.first))}–${esc(shortDay(b.last))}</td>
       ${numCell(integer(b.requests))}${numCell(ms(b.median_ms))}${numCell(ms(b.p90_ms))}${numCell(ms(b.per_1000_median_ms))}${numCell(change(b.change_vs_previous))}</tr>`).join("");
     return `<table><thead><tr><th>Build</th><th>im Log</th><th class="num">Anfragen</th><th class="num">Median</th><th class="num">p90</th><th class="num">je 1.000 Z.</th><th class="num">zum Vorgänger</th></tr></thead>
@@ -185,7 +185,7 @@
   function page(data) {
     if (!data.log.present) {
       return `${header()}
-        <div class="tile leer"><h2>Kein Request-Log vorhanden</h2><p class="hint">Erwartet unter <code>${esc(data.log.path)}</code>. Die Datei fehlt oder ist leer.</p></div>`;
+        <div class="tile empty"><h2>Kein Request-Log vorhanden</h2><p class="hint">Erwartet unter <code>${esc(data.log.path)}</code>. Die Datei fehlt oder ist leer.</p></div>`;
     }
     const metrics = data.metrics, previous = data.previous || {};
     const calibrationRuns = (data.calibration.rows || []).reduce((s, row) => s + (isNumber(row.runs) ? row.runs : 0), 0);
