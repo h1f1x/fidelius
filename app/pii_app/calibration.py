@@ -85,9 +85,15 @@ class Calibration:
 
 
 def _least_squares(points: list[tuple[int, int]]) -> tuple[float, float]:
+    """Beste Gerade mit Sockel und Rate ≥ 0, denn eine negative Laufzeit gibt es nicht."""
     n = len(points)
     mx = sum(x for x, _ in points) / n
     my = sum(y for _, y in points) / n
     rate = (sum((x - mx) * (y - my) for x, y in points)
             / sum((x - mx) ** 2 for x, _ in points))
-    return my - rate * mx, rate
+    if rate < 0:  # längere Texte schneller: Messrauschen, kein echter Effekt
+        return my, 0.0
+    base = my - rate * mx
+    if base < 0:  # Gerade durch den Nullpunkt, z. B. wenn lange Texte überproportional dauern
+        return 0.0, sum(x * y for x, y in points) / sum(x * x for x, _ in points)
+    return base, rate

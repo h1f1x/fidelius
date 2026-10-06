@@ -101,3 +101,39 @@ def test_failing_detector_logs_and_publishes_no_calibration(caplog):
     record = next(r for r in caplog.records if r.name == "pii_app.calibration")
     assert "Kalibrierung fehlgeschlagen" in record.getMessage()
     assert record.exc_info is not None  # Traceback landet im Log
+
+
+def test_convex_runtimes_clamp_base_to_zero():
+    clock = FakeClock()
+
+    def quadratic(text):
+        clock.now += len(text) ** 2 * 2 ** -20  # wächst schneller als linear
+        return []
+
+    pipeline = Pipeline(laya=FakeLaya(), detectors=[quadratic], clock=clock)
+    calibration = Calibration(pipeline, EXAMPLES)
+
+    calibration.run()
+
+    result = calibration.as_dict()
+    # Frei gerechnet ergäbe die Gerade -6.641 ms Sockel; durch den Nullpunkt 7,2616 ms je Zeichen.
+    assert result["base_ms"] == 0
+    assert abs(result["rate_ms_per_char"] - 7.2616) < 0.001
+
+
+def test_falling_runtimes_clamp_rate_to_zero():
+    clock = FakeClock()
+
+    def shrinking(text):
+        clock.now += 10 - len(text) / 1000  # längere Texte gehen schneller, etwa durch Messrauschen
+        return []
+
+    pipeline = Pipeline(laya=FakeLaya(), detectors=[shrinking], clock=clock)
+    calibration = Calibration(pipeline, EXAMPLES)
+
+    calibration.run()
+
+    result = calibration.as_dict()
+    # Messungen 9.485, 8.617 und 2.161 ms: ohne Rate bleibt ihr Mittel als Sockel.
+    assert result["rate_ms_per_char"] == 0
+    assert abs(result["base_ms"] - 6754.3) < 1
