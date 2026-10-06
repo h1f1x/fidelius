@@ -35,7 +35,7 @@ Stand: 2026-10-06, Ergebnis einer Klärungsrunde und eines UI-Prototyps. Alle Pu
   - Median je 1.000 Zeichen
   - Fehlerquote mit Anzahl
   - Anteil als sensibel erkannt
-- **Trend:** Bei 24 h und 7 Tagen steht unter jeder Kennzahl die Abweichung zur gleich langen Vorperiode, rot wenn schlechter, grün wenn besser. Bei „alles“ und wenn die Vorperiode leer ist, steht „kein Vergleich“.
+- **Trend:** Bei 24 h, 7 Tagen und 30 Tagen steht unter jeder Kennzahl die Abweichung zur gleich langen Vorperiode, rot wenn schlechter, grün wenn besser. Bei „alles“ und wenn die Vorperiode leer ist, steht „kein Vergleich“.
 - **Laufzeit:**
   - Histogramm der Gesamtzeit, abgeschnitten bei p99, mit Markierung von Median und p90
   - Phasenanteile am Median als gestapelter Balken
