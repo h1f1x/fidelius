@@ -6,7 +6,7 @@ import tomllib
 from functools import cache
 from pathlib import Path
 
-# Liegt im Image neben pii_app (COPY pyproject.toml im Dockerfile), lokal eine Ebene über dem Paket.
+# Liegt im Image neben fidelius (COPY pyproject.toml im Dockerfile), lokal eine Ebene über dem Paket.
 PYPROJECT = Path(__file__).resolve().parent.parent / "pyproject.toml"
 
 

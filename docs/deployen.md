@@ -53,3 +53,26 @@ wie `make deploy`. Dort dann:
 docker compose ps
 docker compose logs -f
 ```
+
+## Request-Log bleibt leer
+
+Das Request-Log liegt im Volume `request-log`. Docker übernimmt den Eigentümer aus dem Image nur,
+wenn es das Volume neu anlegt. Gibt es das Volume schon, etwa von einem Stand vor dem Log, und
+gehört es `root`, darf die App (Benutzer 10001) nicht hineinschreiben. Prüfungen laufen trotzdem;
+im App-Log steht nur `Request-Log nicht schreibbar`, eine Warnung je Prüfung.
+
+Beheben lässt es sich auf der VM auf zwei Wegen. Der Eigentümer lässt sich umstellen, das Log
+bleibt erhalten:
+
+```bash
+docker compose run --rm --no-deps --user root --entrypoint chown app -R 10001:10001 /var/log/fidelius
+docker compose restart app
+```
+
+Oder das Volume wird neu angelegt, ein bisheriges Log geht dabei verloren:
+
+```bash
+docker compose down
+docker volume rm "$(basename "$PWD")_request-log"
+docker compose up -d --wait
+```

@@ -122,8 +122,9 @@ make test
 | `GLINER_THRESHOLD` | 0.5 | Mindest-Score für GLiNER2-PII-Treffer |
 | `OMP_NUM_THREADS` | 4 | CPU-Threads je Container |
 | `MAX_TEXT_CHARS` | 50000 | Höchstlänge eines Textes je Anfrage, längere lehnt die App ab |
+| `REQUEST_LOG` | /var/log/fidelius/requests.jsonl | Pfad im Container für das Request-Log (eine JSON-Zeile je Prüfung, ohne Text); nur unter `/var/log/fidelius` liegt es auf dem Volume `request-log` |
 
-Kategorien, Farben, Label-Zuordnungen und die Laya-Fragen stehen in `app/pii_app/config.py`.
+Kategorien, Farben, Label-Zuordnungen und die Laya-Fragen stehen in `app/fidelius/config.py`.
 
 ## Bekannte Grenzen
 
@@ -134,7 +135,10 @@ Kategorien, Farben, Label-Zuordnungen und die Laya-Fragen stehen in `app/pii_app
   Anonymisierung ist das unschädlich, der Platzhalter ist nur anders benannt.
 - Reine Jahreszahlen und Wochentage bleiben stehen, Beträge ebenfalls.
 - Laufzeit auf CPU: 5 bis 12 Sekunden je Text, davon der größte Teil die Laya-Bestätigung
-  (rund 0,2 s je Treffer). Ohne Bestätigung (Häkchen in der UI) rund 2 bis 5 Sekunden.
+  (rund 0,2 s je Treffer). Ohne Bestätigung (Häkchen in der UI) rund 2 bis 5 Sekunden. Wie schnell
+  die laufende Maschine ist, misst die App beim Start selbst (Kalibrierung mit drei
+  Beispieltexten); Sockel und Rate je Seite stehen im Expertenmodus bei den Laufzeiten. Ist Laya
+  beim Start nicht erreichbar, bleibt die Kalibrierung aus.
 
 ## Lizenzen der Modelle
 

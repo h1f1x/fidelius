@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import build_info, config
+from .calibration import Calibration
 from .detectors import gliner, spacy_det
 from .models import AnalyzeRequest, AnalyzeResponse, ApplyRequest, ApplyResponse
 from .pipeline import Pipeline
@@ -18,7 +19,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 log = logging.getLogger(__name__)
 
 app = FastAPI(title="PII-Anonymisierung vor dem Prompting", version=build_info.version())
-pipeline = Pipeline()
+pipeline = Pipeline(log_path=config.REQUEST_LOG)
+calibration = Calibration(pipeline, config.EXAMPLES_DIR)
 STATIC = Path(__file__).parent / "static"
 
 
@@ -27,6 +29,7 @@ def _warmup() -> None:
     gliner.warmup()
     spacy_det.warmup()
     log.info("Modelle geladen.")
+    calibration.start()
 
 
 @app.middleware("http")
@@ -67,6 +70,8 @@ def get_config() -> dict:
         "gate_threshold": config.GATE_THRESHOLD,
         "laya_reject_threshold": config.LAYA_REJECT_THRESHOLD,
         "laya_checked_categories": sorted(config.LAYA_CHECKED_CATEGORIES),
+        "max_text_chars": config.MAX_TEXT_CHARS,
+        "calibration": calibration.as_dict(),
         "build": build_info.build(),
     }
 
@@ -104,7 +109,7 @@ def analyze(req: AnalyzeRequest) -> AnalyzeResponse:
     if not req.text.strip():
         raise HTTPException(400, "Leerer Text")
     _check_length(req.text)
-    return pipeline.analyze(req)
+    return pipeline.analyze(req, source="anfrage")
 
 
 @app.post("/api/apply", response_model=ApplyResponse)
