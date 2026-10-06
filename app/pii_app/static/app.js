@@ -19,15 +19,16 @@
   function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.remove("hidden"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.add("hidden"), 1800); }
   // Eine A4-Seite Fließtext, wie man sie aus Word kennt. Zeichen allein sagen Laien wenig.
   const PAGE_CHARS = 3300;
-  const pages = (chars) => { const n = Math.max(1, Math.round(chars / PAGE_CHARS)); return `etwa ${n.toLocaleString("de-DE")} ${n === 1 ? "Seite" : "Seiten"}`; };
-  const secs = (ms) => (ms / 1000).toLocaleString("de-DE", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " s";
+  // Zahlen in deutscher Schreibweise: 3.300 Zeichen, 1,5 s.
+  const num = (x, opts) => x.toLocaleString("de-DE", opts);
+  const pages = (chars) => { const n = Math.max(1, Math.round(chars / PAGE_CHARS)); return `etwa ${num(n)} ${n === 1 ? "Seite" : "Seiten"}`; };
+  const secs = (ms) => num(ms / 1000, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + " s";
   // Geschätzte Dauer einer Prüfung; null ohne Kalibrierung, dann gibt es keinen Balken.
   const estimateMs = (c, chars) => c ? c.base_ms + c.rate_ms_per_char * chars : null;
   // Ist und Schätzung statt Countdown: ein falscher Countdown ärgert mehr als eine ehrliche Angabe.
   // Der Balken hält bei 95 %, damit er nie „fertig“ zeigt, solange die Antwort noch fehlt.
   function progress(elapsed, estimate) {
-    const n = (s) => s.toLocaleString("de-DE");
-    const text = `Prüfe … ${n(Math.floor(elapsed / 1000))} s von ca. ${n(Math.max(1, Math.round(estimate / 1000)))} s`;
+    const text = `Prüfe … ${num(Math.floor(elapsed / 1000))} s von ca. ${num(Math.max(1, Math.round(estimate / 1000)))} s`;
     return { percent: Math.round(Math.min(95, 100 * elapsed / estimate)), text: elapsed > estimate ? text + ", dauert länger als geschätzt" : text };
   }
   function showError(msg) { const e = $("error"); if (!msg) { e.classList.add("hidden"); return; } e.textContent = msg; e.classList.remove("hidden"); }
@@ -78,7 +79,7 @@
   // Die Grenze kommt vom Server, damit sie nach einer Änderung von MAX_TEXT_CHARS weiter stimmt.
   function renderLimit() {
     for (const el of document.querySelectorAll(".maxpages")) el.textContent = pages(CONFIG.max_text_chars);
-    $("pageChars").textContent = PAGE_CHARS.toLocaleString("de-DE");
+    $("pageChars").textContent = num(PAGE_CHARS);
   }
   // Woher die Laufzeitschätzung kommt: gemessen beim Start dieses Dienstes, auf dieser Maschine.
   function calibrationText(c) {
@@ -259,7 +260,7 @@
   }
   function stepSummary(i, st) {
     if (i === 0) return st.notSensitive ? "nichts Sensibles gefunden"
-      : `${state.text.length.toLocaleString("de-DE")} Zeichen · ${state.mapping.length} Ersetzungen`;
+      : `${num(state.text.length)} Zeichen · ${state.mapping.length} Ersetzungen`;
     if (i === 1) return state.copied ? "kopiert" : "Antwort liegt vor";
     return $("restoreInfo").textContent;
   }
