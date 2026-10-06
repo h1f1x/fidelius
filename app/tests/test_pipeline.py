@@ -2,9 +2,9 @@
 import json
 from concurrent.futures import ThreadPoolExecutor
 
-from pii_app.detectors.base import RawHit
-from pii_app.models import AnalyzeRequest, Entity
-from pii_app.pipeline import Pipeline
+from fidelius.detectors.base import RawHit
+from fidelius.models import AnalyzeRequest, Entity
+from fidelius.pipeline import Pipeline
 
 TEXT = "Herr Emre Yilmaz wohnt in Berlin."
 

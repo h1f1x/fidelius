@@ -3,8 +3,8 @@
 (() => {
   const $ = (id) => document.getElementById(id);
   const SOURCE_BADGE = { gliner: "G", spacy: "S", regex: "R" };
-  const STORAGE_KEY = "pii-app-state-v2";
-  const EXPERT_KEY = "pii-app-expert";
+  const STORAGE_KEY = "fidelius-state-v2";
+  const EXPERT_KEY = "fidelius-expert";
 
   let CONFIG = { categories: {} };
   const emptyState = () => ({ text: "", entities: [], mapping: [], anonymized: "", gate: null, timing: null, elapsed_ms: null, copied: false });

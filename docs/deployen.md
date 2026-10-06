@@ -65,7 +65,7 @@ Beheben lässt es sich auf der VM auf zwei Wegen. Der Eigentümer lässt sich um
 bleibt erhalten:
 
 ```bash
-docker compose run --rm --no-deps --user root --entrypoint chown app -R 10001:10001 /var/log/pii-app
+docker compose run --rm --no-deps --user root --entrypoint chown app -R 10001:10001 /var/log/fidelius
 docker compose restart app
 ```
 

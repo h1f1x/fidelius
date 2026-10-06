@@ -3,8 +3,8 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
-from pii_app import config
-from pii_app.main import app
+from fidelius import config
+from fidelius.main import app
 
 
 def test_config_reports_max_text_chars(monkeypatch):

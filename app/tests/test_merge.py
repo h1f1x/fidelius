@@ -1,5 +1,5 @@
-from pii_app.detectors.base import RawHit
-from pii_app.merge import merge_hits
+from fidelius.detectors.base import RawHit
+from fidelius.merge import merge_hits
 
 
 def test_longest_span_wins_and_sources_collected():

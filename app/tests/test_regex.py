@@ -1,4 +1,4 @@
-from pii_app.detectors.regex_det import detect_regex
+from fidelius.detectors.regex_det import detect_regex
 
 
 def cats(text):

@@ -2,8 +2,8 @@
 import threading
 from pathlib import Path
 
-from pii_app.calibration import Calibration
-from pii_app.pipeline import Pipeline
+from fidelius.calibration import Calibration
+from fidelius.pipeline import Pipeline
 
 from .test_pipeline import FakeClock, FakeLaya, read_log
 
@@ -98,7 +98,7 @@ def test_failing_detector_logs_and_publishes_no_calibration(caplog):
     calibration.run()  # darf nicht werfen, sonst stirbt der Thread stumm
 
     assert calibration.as_dict() is None
-    record = next(r for r in caplog.records if r.name == "pii_app.calibration")
+    record = next(r for r in caplog.records if r.name == "fidelius.calibration")
     assert "Kalibrierung fehlgeschlagen" in record.getMessage()
     assert record.exc_info is not None  # Traceback landet im Log
 
