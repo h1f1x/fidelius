@@ -18,7 +18,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 log = logging.getLogger(__name__)
 
 app = FastAPI(title="PII-Anonymisierung vor dem Prompting", version=build_info.version())
-pipeline = Pipeline()
+pipeline = Pipeline(log_path=config.REQUEST_LOG)
 STATIC = Path(__file__).parent / "static"
 
 
@@ -105,7 +105,7 @@ def analyze(req: AnalyzeRequest) -> AnalyzeResponse:
     if not req.text.strip():
         raise HTTPException(400, "Leerer Text")
     _check_length(req.text)
-    return pipeline.analyze(req)
+    return pipeline.analyze(req, source="anfrage")
 
 
 @app.post("/api/apply", response_model=ApplyResponse)

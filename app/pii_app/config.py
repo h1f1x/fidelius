@@ -98,6 +98,10 @@ DATE_STOPWORDS = {
 
 EXAMPLES_DIR = os.environ.get("EXAMPLES_DIR", "/opt/examples")
 
+# Eine JSON-Zeile je Prüfung für die spätere Auswertung (Textlängen, Gate-Quote, Dauern).
+# Liegt auf einem Volume, weil docker logs einen Deploy nicht überdauert.
+REQUEST_LOG = os.environ.get("REQUEST_LOG", "/var/log/pii-app/requests.jsonl")
+
 # Obergrenze je Anfrage. Eine lange Mailkette hat einige tausend Zeichen; ohne Grenze hält ein
 # einzelner Request mit Megabytes an Text die CPU minutenlang fest.
 MAX_TEXT_CHARS = int(os.environ.get("MAX_TEXT_CHARS", "50000"))

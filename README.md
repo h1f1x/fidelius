@@ -122,6 +122,7 @@ make test
 | `GLINER_THRESHOLD` | 0.5 | Mindest-Score für GLiNER2-PII-Treffer |
 | `OMP_NUM_THREADS` | 4 | CPU-Threads je Container |
 | `MAX_TEXT_CHARS` | 50000 | Höchstlänge eines Textes je Anfrage, längere lehnt die App ab |
+| `REQUEST_LOG` | /var/log/pii-app/requests.jsonl | Pfad im Container für das Request-Log (eine JSON-Zeile je Prüfung, ohne Text); nur unter `/var/log/pii-app` liegt es auf dem Volume `request-log` |
 
 Kategorien, Farben, Label-Zuordnungen und die Laya-Fragen stehen in `app/pii_app/config.py`.
 

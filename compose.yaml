@@ -43,12 +43,15 @@ services:
       LAYA_RECAT_THRESHOLD: "${LAYA_RECAT_THRESHOLD:-0.95}"
       GLINER_THRESHOLD: "${GLINER_THRESHOLD:-0.5}"
       MAX_TEXT_CHARS: "${MAX_TEXT_CHARS:-50000}"
+      REQUEST_LOG: "${REQUEST_LOG:-/var/log/pii-app/requests.jsonl}"
       OMP_NUM_THREADS: "${OMP_NUM_THREADS:-4}"
       HF_HUB_OFFLINE: "1"
     ports:
       - "${APP_BIND:-127.0.0.1}:${APP_PORT:-8080}:8080"
     volumes:
       - ./examples:/opt/examples:ro
+      # Request-Log; überdauert Deploys, make down (ohne -v) lässt es stehen.
+      - request-log:/var/log/pii-app
     depends_on:
       laya:
         condition: service_healthy
@@ -64,3 +67,4 @@ services:
 
 volumes:
   laya-model-cache:
+  request-log:

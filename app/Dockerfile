@@ -14,9 +14,11 @@ RUN pip install \
     && python -m spacy download de_core_news_lg \
     && pip check
 # Ab hier ohne root: Die Gewichte landen im Cache des App-Users, und die App läuft als dieser User.
+# Das Log-Verzeichnis gehört ihm schon im Image, weil ein neues benanntes Volume Eigentümer und
+# Rechte vom Image-Verzeichnis übernimmt; sonst gehörte es root und das Request-Log bliebe leer.
 RUN groupadd --gid 10001 app \
     && useradd --uid 10001 --gid app --create-home app \
-    && mkdir -p "$HF_HOME" && chown app:app "$HF_HOME"
+    && mkdir -p "$HF_HOME" /var/log/pii-app && chown app:app "$HF_HOME" /var/log/pii-app
 USER app
 # GLiNER2-PII einmal laden, damit die Gewichte im Image liegen.
 RUN python -c "from gliner2 import GLiNER2; GLiNER2.from_pretrained('fastino/gliner2-privacy-filter-PII-multi')"
