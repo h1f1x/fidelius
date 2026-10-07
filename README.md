@@ -128,6 +128,18 @@ make loadtest ARGS="--url http://localhost:8080 --stages 1,2 --min-duration 20 -
 Ergebnisse landen in `loadtest-results/` (nicht im Repo), am Ende steht eine Tabelle je Stufe auf
 der Konsole.
 
+`make loadtest-report` fasst die Läufe aus `loadtest-results/` als `loadtest-results/bericht.html`
+zusammen: Sweet Spot, eine Zeile je Lauf und die Grafiken zu Antwortzeit, Durchsatz, Zeitanteilen,
+Klassen, Langtext und CPU/RAM/steal. Die Datei braucht kein Netz und lässt sich weitergeben.
+
+```bash
+make loadtest-report                                    # alle Läufe, Ziellast 4
+make loadtest-report ARGS="--runs '*-8cpu-*' --target 3"   # Auswahl und andere Ziellast
+make loadtest-report ARGS="--request-log requests.jsonl"   # echte Gleichzeitigkeit dazu
+```
+
+Das Request-Log kommt über `/api/request-log` von der laufenden App.
+
 ## Stellschrauben
 
 | Variable | Standard | Wirkung |
