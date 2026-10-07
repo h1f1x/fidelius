@@ -112,6 +112,22 @@ Unit-Tests ohne Modelle (Regex, Zusammenführen, Platzhalter, Rückübersetzung)
 make test
 ```
 
+## Lasttest
+
+`make loadtest` misst, wie die App auf gleichzeitige Prüfungen reagiert: eine Treppe von 1 bis 20
+gleichzeitigen Prüfungen, bis die Antwortzeiten die Bruchgrenze überschreiten. Methode und
+Bewertung stehen in [docs/specs/lasttest.md](docs/specs/lasttest.md).
+
+```bash
+make loadtest                        # Dev-VM per SSH-Tunnel, Variablen wie bei make deploy
+make loadtest ARGS="--label 16gb"    # Zusatz im Namen des Ergebnisverzeichnisses
+make loadtest ARGS="--url http://localhost:8080 --stages 1,2 --min-duration 20 --min-requests 3"
+                                     # kurzer Rauchlauf gegen make up
+```
+
+Ergebnisse landen in `loadtest-results/` (nicht im Repo), am Ende steht eine Tabelle je Stufe auf
+der Konsole.
+
 ## Stellschrauben
 
 | Variable | Standard | Wirkung |
