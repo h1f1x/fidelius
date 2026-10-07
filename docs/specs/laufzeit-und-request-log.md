@@ -49,9 +49,12 @@ Stand: 2026-10-06, Ergebnis einer Klärungsrunde. Alle Punkte sind entschieden, 
 - **Zweck:** spätere Auswertung, also wie lang die Texte sind, wie oft das Gate anschlägt und wie lange es dauert.
 - **Was geloggt wird:** nur `/api/analyze`. Korrekturen über `/api/apply` sind Handarbeit und sagen nichts über Dauer oder Erkennung.
 - **Kalibrierläufe:** Die Läufe beim Start, auch der Aufwärmlauf, kommen mit ins Log und tragen `"quelle": "kalibrierung"`, echte Anfragen tragen `"quelle": "anfrage"`. So ist pro Build-Stand nachvollziehbar, wie schnell Modell und Maschine waren, und die Auswertung kann die Läufe herausfiltern.
+- **Lasttest:** Eine Anfrage an `/api/analyze` mit dem Header `X-Fidelius-Quelle: lasttest` trägt `"quelle": "lasttest"` (siehe `docs/specs/lasttest.md`). So verfälscht ein Lasttest die Auswertung echter Nutzung nicht.
+  - Andere Werte des Headers ignoriert die App, die Anfrage trägt dann `"quelle": "anfrage"` wie ohne Header.
+  - Die Antwort ist mit und ohne Header dieselbe.
 - **Format:** JSONL, ein JSON-Objekt pro Anfrage.
 - **Felder:**
-  - Zeitstempel, Build-Stand, Quelle (`anfrage` oder `kalibrierung`)
+  - Zeitstempel, Build-Stand, Quelle (`anfrage`, `kalibrierung` oder `lasttest`)
   - Zeichenzahl
   - Sensitivität:
     - Gate-Wert von Laya

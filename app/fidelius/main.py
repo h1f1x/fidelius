@@ -5,7 +5,7 @@ import logging
 import os
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -105,11 +105,15 @@ def _check_length(text: str) -> None:
 
 
 @app.post("/api/analyze", response_model=AnalyzeResponse)
-def analyze(req: AnalyzeRequest) -> AnalyzeResponse:
+def analyze(
+    req: AnalyzeRequest,
+    quelle: str | None = Header(default=None, alias="X-Fidelius-Quelle"),
+) -> AnalyzeResponse:
+    """Der Header kennzeichnet Lasttest-Anfragen im Request-Log (docs/specs/lasttest.md)."""
     if not req.text.strip():
         raise HTTPException(400, "Leerer Text")
     _check_length(req.text)
-    return pipeline.analyze(req, source="anfrage")
+    return pipeline.analyze(req, source="lasttest" if quelle == "lasttest" else "anfrage")
 
 
 @app.post("/api/apply", response_model=ApplyResponse)

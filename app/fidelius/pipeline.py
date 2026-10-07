@@ -23,7 +23,7 @@ from .request_log import RequestLog
 log = logging.getLogger(__name__)
 
 Detector = Callable[[str], list[RawHit]]
-Source = Literal["anfrage", "kalibrierung"]
+Source = Literal["anfrage", "kalibrierung", "lasttest"]
 DEFAULT_DETECTORS: tuple[Detector, ...] = (detect_gliner, detect_spacy, detect_regex)
 
 
