@@ -95,19 +95,22 @@ def test_failed_requests_enter_percentiles_with_their_time_but_not_throughput():
     assert stage["throughput_per_min"] == 0.9  # 3 fertige Prüfungen in 200 s
 
 
-def test_phase_medians_include_skipped_phases_and_rest_is_client_minus_server_time():
+def test_phase_medians_skip_phases_that_did_not_run_and_rest_is_client_minus_server_time():
     def timing(gate, detect, laya, total):
         return {"gate_ms": gate, "detect_ms": detect, "laya_check_ms": laya, "total_ms": total}
+    harmless = "04_terminabsprache_harmlos"  # endet am Gate, Erkennung und Laya liefen nicht
     requests = [
         req(1, 0, 9000, timing=timing(1000, 3000, 4000, 8100)),
-        req(1, 9, 1200, beispiel="04_terminabsprache_harmlos", timing=timing(900, 0, 0, 950)),
-        req(1, 11, 6500, timing=timing(1100, 2000, 3000, 6200)),
-        req(1, 18, 180000, status=None, fehler="Client-Timeout nach 180 s"),
+        req(1, 9, 1200, beispiel=harmless, timing=timing(900, 0, 0, 950)),
+        req(1, 11, 1300, beispiel=harmless, timing=timing(950, 0, 0, 1000)),
+        req(1, 13, 6500, timing=timing(1100, 2000, 3000, 6200)),
+        req(1, 20, 180000, status=None, fehler="Client-Timeout nach 180 s"),
     ]
 
     stage = ev.evaluate_run(requests)["stages"][0]
 
-    assert stage["phases_ms"] == {"gate": 1000, "detect": 2000, "laya": 3000, "rest": 300}
+    # Mit den Nullen der harmlosen Prüfungen wären Erkennung und Laya im Median 0.
+    assert stage["phases_ms"] == {"gate": 950, "detect": 2000, "laya": 3000, "rest": 300}
 
 
 def test_comfort_limit_is_highest_stage_with_p95_up_to_20s_below_the_first_break():

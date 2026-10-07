@@ -332,15 +332,19 @@ def stage_metrics(requests: list[dict]) -> dict:
 
 
 def _phases(counted: list[dict]) -> dict:
-    """Mediane über alle Anfragen mit Antwort. Eine Phase, die nicht lief, geht mit 0 ein (so
-    liefert sie die App): Die Werte beschreiben die typische Prüfung der Stufe, deren Mischung
-    auch das harmlose Beispiel enthält, das am Gate endet. Rest ist Client-Zeit minus total_ms,
-    also Warten vor der App, Netz und Proxy."""
+    """Mediane über alle Anfragen mit Antwort. Eine Phase, die bei einer Prüfung nicht lief (die
+    App liefert dann 0, etwa Erkennung und Laya beim harmlosen Beispiel, das am Gate endet),
+    zählt für diese Phase nicht mit, wie in /auswertung (app/fidelius/log_report.py). Rest ist
+    Client-Zeit minus total_ms, also Warten vor der App, Netz und Proxy."""
     timed = [r for r in counted if isinstance(r.get("timing"), dict)]
+
+    def ran(key):
+        return percentile([v for r in timed if (v := r["timing"][key])], 50)
+
     return {
-        "gate": percentile([r["timing"]["gate_ms"] for r in timed], 50),
-        "detect": percentile([r["timing"]["detect_ms"] for r in timed], 50),
-        "laya": percentile([r["timing"]["laya_check_ms"] for r in timed], 50),
+        "gate": ran("gate_ms"),
+        "detect": ran("detect_ms"),
+        "laya": ran("laya_check_ms"),
         "rest": percentile([r["client_ms"] - r["timing"]["total_ms"] for r in timed], 50),
     }
 

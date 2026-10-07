@@ -346,8 +346,9 @@ def _phase_chart(rows: list[dict]) -> str:
                      for _, label, color in PHASES)
     return (_stacked_panels(rows, stack, tip, top=max(sums), y_fmt=_seconds)
             + f'<div class="legendrow">{legend}</div>'
-            + '<p class="hint">Mediane je Phase über die gezählten Prüfungen; ihre Summe ist nicht '
-            "der Median der Gesamtzeit. Rest ist Client-Zeit minus Serverzeit: Netz, Proxy und "
+            + '<p class="hint">Mediane je Phase über die gezählten Prüfungen, in denen sie lief: '
+            "Erkennung und Laya ohne das harmlose Beispiel, das am Gate endet. Ihre Summe ist "
+            "nicht der Median der Gesamtzeit. Rest ist Client-Zeit minus Serverzeit: Netz, Proxy und "
             "Warten vor der App.</p>")
 
 
