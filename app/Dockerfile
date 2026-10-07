@@ -11,6 +11,7 @@ COPY pyproject.toml ./
 RUN pip install \
       "fastapi>=0.115" "uvicorn[standard]>=0.30" "httpx>=0.27" "pydantic>=2.7" \
       "gliner2[local]==2.0.0" "transformers==4.51.3" "sentencepiece>=0.2" "protobuf>=4" "spacy>=3.8,<3.9" \
+      "google-re2>=1.1" \
     && python -m spacy download de_core_news_lg \
     && pip check
 # Ab hier ohne root: Die Gewichte landen im Cache des App-Users, und die App läuft als dieser User.
