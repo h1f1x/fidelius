@@ -16,7 +16,7 @@ WAIT_TIMEOUT ?= 1800
 # Die Unit-Tests brauchen keine Modelle, deshalb nur diese Pakete statt aller Abhängigkeiten.
 TEST_DEPS := --with pydantic --with httpx --with fastapi --with pytest --with google-re2
 
-.PHONY: help init up down logs status test examples deploy remote-login \
+.PHONY: help init up down logs status test examples loadtest deploy remote-login \
         _tools-Darwin _tools-Linux _runtime-Darwin _runtime-Linux _start-Darwin _start-Linux \
         _compose _memory
 
@@ -46,6 +46,10 @@ examples: ## Beispielmails gegen die laufende App prüfen, z. B. make examples A
 	@curl -fsS -o /dev/null http://localhost:$(APP_PORT)/api/health \
 	  || { echo "App antwortet nicht auf Port $(APP_PORT). Erst: make up"; exit 1; }
 	uv run --no-project --python 3.12 scripts/run_examples.py --url http://localhost:$(APP_PORT) $(ARGS)
+
+# Ohne --url in ARGS geht der Test per SSH-Tunnel an die VM, mit denselben Variablen wie deploy.
+loadtest: ## Lasttest, Ergebnis in loadtest-results/, z. B. make loadtest ARGS="--label 16gb"
+	uv run --no-project --python 3.12 scripts/loadtest.py $(ARGS)
 
 deploy: ## Arbeitsstand per rsync auf die VM bringen und starten, z. B. make deploy DEPLOY_HOST=user@vm
 	scripts/deploy.sh
