@@ -362,8 +362,8 @@ def _phase_chart(rows: list[dict]) -> str:
 
 
 def _longtext_chart(rows: list[dict]) -> str:
-    """Je Lauf zwei Balken: p95 der Stufe c* aus der Treppe und p95 der anderen Nutzer, während
-    einer den Langtext schickt."""
+    """Je Lauf zwei Balken: p95 aller Nutzer der Stufe c* aus der Treppe und p95 der übrigen
+    Nutzer, während einer den Langtext schickt."""
     with_part = [(i, r) for i, r in enumerate(rows) if r["longtext"]]
     missing = [r["name"] for r in rows if not r["longtext"]]
     note = (f'<p class="hint">Ohne Langtext-Abschnitt: {escape(", ".join(missing))}</p>'
@@ -408,8 +408,9 @@ def _longtext_chart(rows: list[dict]) -> str:
     parts.append(f'<line class="ref" x1="{sx(ev.COMFORT_P95_MS)}" x2="{sx(ev.COMFORT_P95_MS)}" '
                  f'y1="0" y2="{height - 16}"/>')
     return (f'<svg class="chart" viewBox="0 0 {WIDE} {height}" role="img">{"".join(parts)}</svg>'
-            + '<p class="hint">p95 der anderen Nutzer bei der Stufe c*, einmal aus der Treppe, '
-            "einmal während einer von ihnen den Langtext (alle Beispiele aneinander) schickt. "
+            + '<p class="hint">Stufe c*. „ohne“: p95 aller c* Nutzer derselben Stufe aus der '
+            "Treppe. „mit Langtext“: p95 der übrigen Nutzer, während einer von ihnen den "
+            "Langtext (alle Beispiele aneinander) schickt. "
             f"Gestrichelt: Komfortgrenze {_seconds(ev.COMFORT_P95_MS)}.</p>" + note)
 
 

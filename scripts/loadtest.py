@@ -8,7 +8,9 @@
 Aufruf über make, Optionen in ARGS:
     make loadtest                                   # Dev-VM über SSH-Tunnel, liest die VM mit
     make loadtest ARGS="--label 16gb"               # Label im Namen des Ergebnisverzeichnisses
-    make loadtest ARGS="--url https://… --vm"       # über Caddy, die VM trotzdem mitlesen
+    make loadtest ARGS="--url https://… --vm --stages 4 --no-longtext --label caddy"
+                                                    # über Caddy bei der Ziellast, eine Stufe,
+                                                    # die VM trotzdem mitlesen
     make loadtest ARGS="--url http://localhost:8080 --stages 1,2 --min-duration 20 --min-requests 3"
                                                     # Rauchlauf gegen make up
 
