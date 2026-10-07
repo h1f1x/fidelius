@@ -3,22 +3,27 @@ from __future__ import annotations
 
 import re
 
+import re2
+
 from .base import RawHit
 
-_EMAIL = re.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
+# Alle Muster ohne Lookaround laufen auf RE2: kein Backtracking, lineare Laufzeit, also kann
+# kein präparierter Text die Erkennung zum Hängen bringen. Das Telefon-Muster braucht noch
+# Lookarounds, die RE2 nicht kennt, und bleibt bis zu seiner Umstellung auf dem re-Modul.
+_EMAIL = re2.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
 
 # Deutsche Telefonformate: +49 30 1234567, 0049 30 123 45 67, 030/1234567, (030) 12 34 56, 0171-1234567
 _PHONE = re.compile(
     r"(?<![\w.])(?:\+49|0049|\(0\)|0)[\s\-/]?\(?\d{2,5}\)?[\s\-/]?\d{2,}(?:[\s\-/]?\d{1,})*(?!\w)(?!\.\d)"
 )
 
-_IBAN = re.compile(r"\b[A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]{4}){2,7}(?:[ ]?[A-Z0-9]{1,4})?\b")
+_IBAN = re2.compile(r"\b[A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]{4}){2,7}(?:[ ]?[A-Z0-9]{1,4})?\b")
 
 _MONTHS = (
     "Januar|Februar|März|Maerz|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember|"
     "Jan\\.|Feb\\.|Mär\\.|Apr\\.|Jun\\.|Jul\\.|Aug\\.|Sep\\.|Sept\\.|Okt\\.|Nov\\.|Dez\\."
 )
-_DATE = re.compile(
+_DATE = re2.compile(
     r"\b(?:"
     r"\d{1,2}\.\s?\d{1,2}\.\s?(?:\d{4}|\d{2})"            # 03.05.2026, 3.5.26
     r"|\d{1,2}\.\s?(?:" + _MONTHS + r")\s?\d{4}"            # 3. Mai 2026
@@ -27,29 +32,33 @@ _DATE = re.compile(
     r")\b"
 )
 
-_STREET = re.compile(
-    r"\b[A-ZÄÖÜ][\wäöüß.\-]*(?:[ -][A-ZÄÖÜ][\wäöüß.\-]*)*"
+# RE2 kennt \w und \b nur für ASCII. Vor „Überseering“ sähe \b also keine Wortgrenze, und
+# „Cézanne“ zerfiele. Darum steht [\pL\pN_] für ein Wortzeichen, und der Wortanfang wird als
+# vorangehendes Nicht-Wortzeichen geprüft; der Treffer selbst liegt dann in Gruppe 1.
+_WORD_START = r"(?:^|[^\pL\pN_])"
+
+_STREET = re2.compile(
+    _WORD_START + r"([A-ZÄÖÜ][\pL\pN_.\-]*(?:[ -][A-ZÄÖÜ][\pL\pN_.\-]*)*"
     r"(?:straße|strasse|str\.|Straße|Strasse|Str\.|weg|Weg|allee|Allee|platz|Platz|gasse|Gasse|"
-    r"ring|Ring|damm|Damm|ufer|Ufer|chaussee|Chaussee)\s+\d+\s?[a-zA-Z]?\b"
+    r"ring|Ring|damm|Damm|ufer|Ufer|chaussee|Chaussee)\s+\d+\s?[a-zA-Z]?\b)"
 )
 
 # Kennungen hinter Schlüsselwörtern: "Versicherungsschein-Nr.: KV-2024-00123", "Kundennummer 4711-88"
-_ID_KEYWORD = re.compile(
+_ID_KEYWORD = re2.compile(
     r"(?:Versicherungsschein|Versicherungs|Vertrags|Kunden|Schaden|Schadens|Policen|Police|"
     r"Mitglieds|Personal|Rechnungs|Akten|Vorgangs|Auftrags|Angebots|Steuer|Sozialversicherungs|"
     r"Betriebs|Bestell|Lieferanten|Objekt|Fall|Mandanten|Partner|Makler|Agentur|Vermittler|"
     r"Rentenversicherungs|Konto|Fahrgestell|Kennzeichen|Ticket|Referenz)"
     r"[\s\-]?(?:Nummer|nummer|Nr\.?|nr\.?|ID|Id|Kennung|kennung|zeichen|Zeichen)?\s*[:#]?\s*"
-    r"(?P<id>[A-Z]{0,4}[\-/ ]?\d[A-Z0-9\-/]*(?: [A-Z0-9][A-Z0-9\-/]*){0,5})",
-    re.UNICODE,
+    r"(?P<id>[A-Z]{0,4}[\-/ ]?\d[A-Z0-9\-/]*(?: [A-Z0-9][A-Z0-9\-/]*){0,5})"
 )
 # Alleinstehende Kennungen mit Buchstabenpräfix: VS-2024-001234, KD/889911, SN2026-0042
-_ID_PREFIXED = re.compile(r"\b[A-Z]{2,4}[\-/]?\d{2,}(?:[\-/][A-Z0-9]{2,}){0,4}\b")
+_ID_PREFIXED = re2.compile(r"\b[A-Z]{2,4}[\-/]?\d{2,}(?:[\-/][A-Z0-9]{2,}){0,4}\b")
 # Deutsche Steuer-ID (11 Ziffern) und Sozialversicherungsnummer (12 345678 A 123)
-_TAX_ID = re.compile(r"\b\d{2}\s?\d{3}\s?\d{3}\s?\d{3}\b")
-_SVNR = re.compile(r"\b\d{2}\s?\d{6}\s?[A-Z]\s?\d{3}\b")
+_TAX_ID = re2.compile(r"\b\d{2}\s?\d{3}\s?\d{3}\s?\d{3}\b")
+_SVNR = re2.compile(r"\b\d{2}\s?\d{6}\s?[A-Z]\s?\d{3}\b")
 # Kfz-Kennzeichen: B-AB 1234, M-XY 12, HH-AB 123E
-_PLATE = re.compile(r"\b[A-ZÄÖÜ]{1,3}-[A-Z]{1,2}\s?\d{1,4}[EH]?\b")
+_PLATE = re2.compile(_WORD_START + r"([A-ZÄÖÜ]{1,3}-[A-Z]{1,2}\s?\d{1,4}[EH]?\b)")
 
 
 def _iban_valid(s: str) -> bool:
@@ -80,9 +89,10 @@ def detect_regex(text: str) -> list[RawHit]:
     for m in _DATE.finditer(text):
         add(m.start(), m.end(), "DATUM", "date")
     for m in _STREET.finditer(text):
-        add(m.start(), m.end(), "ADRESSE", "street")
+        add(m.start(1), m.end(1), "ADRESSE", "street")
     for m in _ID_KEYWORD.finditer(text):
-        s, e = m.start("id"), m.end("id")
+        # RE2-Treffer kennen Gruppen nur per Nummer, nicht per Name.
+        s, e = m.span(_ID_KEYWORD.groupindex["id"])
         while e > s and text[e - 1] in "-/ .":
             e -= 1
         if e - s >= 4 and any(ch.isdigit() for ch in text[s:e]):
@@ -94,7 +104,7 @@ def detect_regex(text: str) -> list[RawHit]:
     for m in _SVNR.finditer(text):
         add(m.start(), m.end(), "KENNUNG", "svnr")
     for m in _PLATE.finditer(text):
-        add(m.start(), m.end(), "KENNUNG", "plate")
+        add(m.start(1), m.end(1), "KENNUNG", "plate")
     # Telefon zuletzt, damit Daten/IBAN/Kennungen, die wie Nummern aussehen, Vorrang haben.
     taken = [(h.start, h.end) for h in hits]
     for m in _PHONE.finditer(text):

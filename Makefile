@@ -14,7 +14,7 @@ MIN_DOCKER_MEM_GB ?= 7
 # Der erste Start lädt den Laya-Checkpoint, das kann bei langsamer Leitung dauern.
 WAIT_TIMEOUT ?= 1800
 # Die Unit-Tests brauchen keine Modelle, deshalb nur diese Pakete statt aller Abhängigkeiten.
-TEST_DEPS := --with pydantic --with httpx --with fastapi --with pytest
+TEST_DEPS := --with pydantic --with httpx --with fastapi --with pytest --with google-re2
 
 .PHONY: help init up down logs status test examples deploy remote-login \
         _tools-Darwin _tools-Linux _runtime-Darwin _runtime-Linux _start-Darwin _start-Linux \

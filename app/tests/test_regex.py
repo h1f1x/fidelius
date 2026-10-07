@@ -1,3 +1,5 @@
+import time
+
 from fidelius.detectors.regex_det import detect_regex
 
 
@@ -27,6 +29,16 @@ def test_street():
     assert ("ADRESSE", "Musterstraße 12a") in cats("Wohnhaft in der Musterstraße 12a, 10115 Berlin")
 
 
+def test_street_and_plate_starting_with_umlaut():
+    r = cats("Neue Anschrift: Überseering 5, Kennzeichen ÜB-AB 123.")
+    assert ("ADRESSE", "Überseering 5") in r
+    assert ("KENNUNG", "ÜB-AB 123") in r
+
+
+def test_street_with_accented_letters():
+    assert ("ADRESSE", "Cézanne-Weg 3") in cats("Sie wohnt im Cézanne-Weg 3.")
+
+
 def test_id_keyword_and_prefixed():
     r = cats("Versicherungsschein-Nr.: KV-2024-00123, Kundennummer 4711-88, Vorgang VS-889911.")
     assert ("KENNUNG", "KV-2024-00123") in r
@@ -49,3 +61,13 @@ def test_id_patterns_tightened():
 
 def test_aktenzeichen():
     assert ("KENNUNG", "2026/0912/HH-7781") in cats("unter dem Aktenzeichen 2026/0912/HH-7781 aufgenommen")
+
+
+def test_street_adversarial_input_is_fast():
+    # Viele großgeschriebene Wortteile ohne Straßenendung trieben das alte Muster in
+    # katastrophales Backtracking; unter RE2 bleibt die Laufzeit linear.
+    attack = "Ab-" * 22 + "x, " + "Ab " * 2_000 + "x"
+    start = time.perf_counter()
+    hits = detect_regex(attack)
+    assert time.perf_counter() - start < 0.1
+    assert not any(h.category == "ADRESSE" for h in hits)
