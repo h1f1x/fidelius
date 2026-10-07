@@ -45,6 +45,8 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from .pipeline import CALIBRATION, REQUEST
+
 # Das Log bleibt in UTC; Tage und Stunden zählen so, wie die Nutzer sie erleben.
 BERLIN = ZoneInfo("Europe/Berlin")
 
@@ -296,7 +298,7 @@ def _build_name(info) -> str:
 
 def _calibration(entries: list[dict]) -> dict:
     """Gleiche Texte machen Builds direkt vergleichbar; die Zeichenzahl kennzeichnet den Text."""
-    runs = [e for e in entries if e.get("quelle") == "kalibrierung"]
+    runs = [e for e in entries if e.get("quelle") == CALIBRATION]
     texts = sorted({e["zeichen"] for e in runs})
     rows = []
     for name, group in _by_build(runs).items():
@@ -327,7 +329,7 @@ def _between(entries: list[dict], start: datetime, end: datetime) -> list[dict]:
 
 def _requests(entries: list[dict]) -> list[dict]:
     """Nur echte Nutzung; Kalibrierläufe und Lasttests würden die Kennzahlen verfälschen."""
-    return [e for e in entries if e.get("quelle") == "anfrage"]
+    return [e for e in entries if e.get("quelle") == REQUEST]
 
 
 def _distribution(values: list) -> dict:

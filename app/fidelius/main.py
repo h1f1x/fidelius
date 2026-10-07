@@ -13,7 +13,7 @@ from . import build_info, config, log_report
 from .calibration import Calibration
 from .detectors import gliner, spacy_det
 from .models import AnalyzeRequest, AnalyzeResponse, ApplyRequest, ApplyResponse
-from .pipeline import Pipeline
+from .pipeline import LOAD_TEST, REQUEST, Pipeline
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger(__name__)
@@ -113,7 +113,7 @@ def analyze(
     if not req.text.strip():
         raise HTTPException(400, "Leerer Text")
     _check_length(req.text)
-    return pipeline.analyze(req, source="lasttest" if quelle == "lasttest" else "anfrage")
+    return pipeline.analyze(req, source=LOAD_TEST if quelle == LOAD_TEST else REQUEST)
 
 
 @app.post("/api/apply", response_model=ApplyResponse)

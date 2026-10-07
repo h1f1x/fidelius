@@ -64,6 +64,9 @@ TARGET_LOAD = 4
 BREAK_P95_MS = 60_000
 RAM_HEADROOM = 0.25
 
+# Feld "quelle" im Request-Log der App, wie Source in app/fidelius/pipeline.py.
+REQUEST_SOURCE, LOAD_TEST_SOURCE = "anfrage", "lasttest"
+
 OK, DEGRADED, FAILED = "ok", "degradiert", "fehlgeschlagen"
 CLASSES = (OK, DEGRADED, FAILED)
 CONTAINERS = ("app", "laya")  # Schlüssel von "container" in samples.jsonl
@@ -270,7 +273,7 @@ def concurrency(entries) -> dict:
     gleich weitermacht, wie zwei aus."""
     intervals = []
     for e in entries:
-        if not isinstance(e, dict) or e.get("quelle") != "anfrage":
+        if not isinstance(e, dict) or e.get("quelle") != REQUEST_SOURCE:
             continue
         try:
             end = round(datetime.fromisoformat(e["zeit"]).timestamp() * 1000)

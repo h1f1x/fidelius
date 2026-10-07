@@ -56,6 +56,11 @@ def test_percentile_matches_the_copy_in_the_request_log_report():
             assert ev.percentile(values, p) == log_report._percentile(values, p), (values, p)
 
 
+def test_sources_match_the_request_log_of_the_app():
+    from fidelius import pipeline
+    assert (ev.REQUEST_SOURCE, ev.LOAD_TEST_SOURCE) == (pipeline.REQUEST, pipeline.LOAD_TEST)
+
+
 T0 = datetime(2026, 10, 7, 18, 0, tzinfo=UTC)
 
 

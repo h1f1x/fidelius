@@ -73,7 +73,7 @@ CALIBRATION_WAIT_S = 300
 # zurück; ohne Pause schickte jeder Nutzer bis zum Ende der Stufe Tausende Anfragen ins Leere.
 FAILED_PAUSE_S = 1
 SERVICES = ("app", "laya")
-HEADERS = {"X-Fidelius-Quelle": "lasttest"}
+HEADERS = {"X-Fidelius-Quelle": ev.LOAD_TEST_SOURCE}
 
 
 # ---------- Texte ----------

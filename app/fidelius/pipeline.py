@@ -7,7 +7,7 @@ from collections.abc import Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal
+from typing import Literal, get_args
 
 from . import build_info, config
 from .detectors.base import RawHit
@@ -23,7 +23,9 @@ from .request_log import RequestLog
 log = logging.getLogger(__name__)
 
 Detector = Callable[[str], list[RawHit]]
+# Feld "quelle" im Request-Log; die Konstanten ersparen den übrigen Modulen die Strings.
 Source = Literal["anfrage", "kalibrierung", "lasttest"]
+REQUEST, CALIBRATION, LOAD_TEST = get_args(Source)
 DEFAULT_DETECTORS: tuple[Detector, ...] = (detect_gliner, detect_spacy, detect_regex)
 
 
@@ -38,7 +40,7 @@ class Pipeline:
         self.detectors = tuple(detectors)
         self.pool = ThreadPoolExecutor(max_workers=max(len(self.detectors), 1))
 
-    def analyze(self, req: AnalyzeRequest, source: Source = "anfrage") -> AnalyzeResponse:
+    def analyze(self, req: AnalyzeRequest, source: Source = REQUEST) -> AnalyzeResponse:
         t0 = self.clock()
         timing = Timing()
         text = req.text
