@@ -6,3 +6,7 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 scripts/out/
+
+.agents/
+.claude/
+skills-lock.json
