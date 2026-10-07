@@ -29,8 +29,8 @@ Auf der VM liest das Skript nur: nproc, /proc/meminfo, die .env, docker inspect 
 nach jeder Stufe, alle 2 s docker stats, /proc/stat und MemAvailable. Es startet und ändert dort
 nichts.
 
-Auf dem Mac hält caffeinate den Rechner während des Laufs wach. Schläft er doch ein (Deckel zu),
-stehen Uhr und Anfragen still, und die Stufe misst Unsinn.
+Auf dem Mac hält caffeinate den Rechner während des Laufs wach, unter Linux systemd-inhibit. Schläft
+er doch ein (Deckel zu), stehen Uhr und Anfragen still, und die Stufe misst Unsinn.
 
 Ergebnis unter loadtest-results/<JJJJ-MM-TT-HHMM>-<vcpu>cpu-<threads>t[-<label>]/ (ohne VM:
 …-ohne-vm[-<label>]) mit requests.jsonl, samples.jsonl und run.json. Das Format beschreibt
@@ -51,6 +51,7 @@ import subprocess
 import sys
 import threading
 import time
+from collections.abc import Callable
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -277,10 +278,11 @@ done
 
 @dataclass(frozen=True)
 class VM:
-    """Lesender Zugang zur VM. ssh ist der Befehl bis einschließlich Ziel, etwa
-    ("ssh", "-J", "jump", "user@vm"). Die Skripte gehen wie bei deploy.sh über stdin an bash,
-    so braucht es keine zweite Ebene Quoting für die Remote-Shell."""
-    ssh: tuple[str, ...]
+    """Lesender Zugang zur VM über ssh: host ist das Ziel (etwa user@vm), jump der Sprung-Host
+    oder None, directory das Verzeichnis von Compose. Die Skripte gehen wie bei deploy.sh über
+    stdin an bash, so braucht es keine zweite Ebene Quoting für die Remote-Shell."""
+    host: str
+    jump: str | None
     directory: str
 
     @classmethod
@@ -288,12 +290,18 @@ class VM:
         host = os.environ.get("DEPLOY_HOST")
         if not host:
             sys.exit("DEPLOY_HOST fehlt, siehe docs/deployen.md (oder --url ohne --vm).")
-        jump = os.environ.get("DEPLOY_JUMP")
-        return cls(("ssh", *(("-J", jump) if jump else ()), host),
+        return cls(host, os.environ.get("DEPLOY_JUMP") or None,
                    os.environ.get("DEPLOY_DIR") or "fidelius")
 
+    def ssh(self, *options: str) -> list[str]:
+        """ssh bis einschließlich Ziel; options stehen vor dem Ziel, etwa für einen Tunnel."""
+        return ["ssh", *(("-J", self.jump) if self.jump else ()), *options, self.host]
+
     def argv(self) -> list[str]:
-        return [*self.ssh, "bash", "-s"]
+        return [*self.ssh(), "bash", "-s"]
+
+    def __str__(self) -> str:
+        return self.host + (f" über {self.jump}" if self.jump else "")
 
     def run(self, script: str, timeout: float = 60) -> str:
         done = subprocess.run(self.argv(), input=script, capture_output=True, text=True,
@@ -367,8 +375,7 @@ def tunnel(vm: VM, host: str, port: int):
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
         local = s.getsockname()[1]
-    argv = [*vm.ssh[:-1], "-N", "-o", "ExitOnForwardFailure=yes",
-            "-L", f"127.0.0.1:{local}:{host}:{port}", vm.ssh[-1]]
+    argv = vm.ssh("-N", "-o", "ExitOnForwardFailure=yes", "-L", f"127.0.0.1:{local}:{host}:{port}")
     proc = subprocess.Popen(argv, stdin=subprocess.DEVNULL)
     try:
         deadline = time.monotonic() + 30
@@ -385,7 +392,11 @@ def tunnel(vm: VM, host: str, port: int):
         yield f"http://127.0.0.1:{local}"
     finally:
         proc.terminate()
-        proc.wait(5)
+        try:
+            proc.wait(5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
 
 
 # ---------- Last ----------
@@ -432,7 +443,7 @@ def _detail(response: httpx.Response) -> str:
 
 async def run_stage(client: httpx.AsyncClient, part: str, stage: int,
                     examples: list[tuple[str, str]], gate_threshold: float, rules: StageRules,
-                    write, long: str | None = None) -> None:
+                    write: Callable[[dict], None], long: str | None = None) -> None:
     """Eine Stufe: stage Nutzer schicken ohne Pause die nächste Prüfung, sobald die vorige zurück
     ist (nach einer fehlgeschlagenen erst nach FAILED_PAUSE_S). Ist die Stufe voll, schickt
     keiner mehr, die offenen Anfragen laufen leer. Mit long schickt Nutzer 1 nur den Langtext;
@@ -480,9 +491,14 @@ def now_iso() -> str:
 
 
 def get_json(url: str, path: str) -> dict:
-    response = httpx.get(url + path, timeout=30)
-    response.raise_for_status()
-    return response.json()
+    """GET auf die App. Antwortet sie nicht oder nicht lesbar, endet das Skript mit einer Meldung
+    statt mit einem Traceback: Vor dem Start ist das die ganze Antwort."""
+    try:
+        response = httpx.get(url + path, timeout=30)
+        response.raise_for_status()
+        return response.json()
+    except (httpx.HTTPError, ValueError) as exc:
+        sys.exit(f"App antwortet nicht lesbar auf {path} unter {url}: {exc}")
 
 
 def wait_for_calibration(url: str) -> dict:
@@ -557,10 +573,19 @@ def parse_args() -> argparse.Namespace:
 
 
 def keep_awake() -> None:
-    """macOS: kein Ruhezustand bei Leerlauf, solange dieser Prozess läuft."""
+    """Kein Ruhezustand bei Leerlauf, solange dieser Prozess läuft: caffeinate auf dem Mac,
+    systemd-inhibit unter Linux. Fehlt beides, steht ein Hinweis auf der Konsole."""
+    pid = str(os.getpid())
     if shutil.which("caffeinate"):
-        subprocess.Popen(["caffeinate", "-i", "-w", str(os.getpid())],
-                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        argv = ["caffeinate", "-i", "-w", pid]
+    elif shutil.which("systemd-inhibit"):
+        argv = ["systemd-inhibit", "--what=idle:sleep", "--who=fidelius-lasttest",
+                "--why=Lasttest läuft", "tail", f"--pid={pid}", "-f", "/dev/null"]
+    else:
+        print("HINWEIS: Weder caffeinate noch systemd-inhibit gefunden. Schläft der Rechner "
+              "während des Laufs ein, misst die Stufe Unsinn.")
+        return
+    subprocess.Popen(argv, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 def main() -> int:
@@ -570,8 +595,8 @@ def main() -> int:
     vm = VM.from_env() if not args.url or args.vm else None
     facts = None
     if vm:
-        print(f"VM: lese {' '.join(vm.ssh[1:])}:{vm.directory} …", flush=True)
-        facts = vm.facts()
+        print(f"VM: lese {vm}, Verzeichnis {vm.directory} …", flush=True)
+        facts = _facts(vm)
         if not facts["inspect"]:
             print("  WARNUNG: keine Container app und laya gefunden, Brüche durch Neustart "
                   "bleiben unerkannt.")
@@ -581,10 +606,7 @@ def main() -> int:
 
     with _access(args, vm, facts) as (url, access):
         print(f"Ziel: {url}", flush=True)
-        try:
-            health = get_json(url, "/api/health")
-        except httpx.HTTPError as exc:
-            sys.exit(f"App antwortet nicht unter {url}: {exc}")
+        health = get_json(url, "/api/health")
         if not isinstance(health.get("laya"), dict):
             print(f"  WARNUNG: Laya meldet {health.get('laya')!r}")
         config = wait_for_calibration(url)
@@ -595,21 +617,21 @@ def main() -> int:
               f"{calibration['base_ms']:.0f} ms + {rate} ms/Zeichen", flush=True)
 
         started = datetime.now().astimezone()
-        name = result_dir_name(started, facts and facts["vcpu"], facts and facts["threads"],
-                               args.label)
-        ids = {s: c["id"] for s, c in (facts["inspect"] if facts else {}).items()}
+        # Ohne VM sind Größe, Threads und Container unbekannt.
+        size = {k: facts[k] if facts else None
+                for k in ("vcpu", "ram_bytes", "threads", "threads_quelle")}
+        inspect = facts["inspect"] if facts else None
+        name = result_dir_name(started, size["vcpu"], size["threads"], args.label)
+        ids = {s: c["id"] for s, c in (inspect or {}).items()}
         run = Run(args.out / name, {
             "zeit": started.astimezone(UTC).isoformat(timespec="milliseconds"), "ende": None,
-            "label": args.label, "zugang": access,
-            "vcpu": facts and facts["vcpu"], "ram_bytes": facts and facts["ram_bytes"],
-            "threads": facts and facts["threads"],
-            "threads_quelle": facts and facts["threads_quelle"],
+            "label": args.label, "zugang": access, **size,
             "build": build, "kalibrierung": calibration,
             "gate_threshold": config["gate_threshold"],
             "parameter": {"stufen": args.stages, "min_anfragen": args.min_requests,
                           "min_dauer_s": args.min_duration, "client_timeout_s": CLIENT_TIMEOUT_S,
                           "langtext": not args.no_longtext},
-            "docker_inspect_vorher": facts and facts["inspect"],
+            "docker_inspect_vorher": inspect,
             "docker_inspect_nachher": None, "stufen": [], "abbruch": None,
         })
         print(f"Ablage: {run.dir.relative_to(ROOT) if run.dir.is_relative_to(ROOT) else run.dir}")
@@ -639,6 +661,15 @@ def main() -> int:
     return 130 if run.meta["abbruch"] else 0
 
 
+def _facts(vm: VM) -> dict:
+    """vm.facts(), oder Schluss mit einer Meldung, wenn ssh scheitert: Ohne die Größe der VM
+    lässt sich der Lauf nicht einordnen."""
+    try:
+        return vm.facts()
+    except (RuntimeError, OSError, subprocess.TimeoutExpired) as exc:
+        sys.exit(f"VM {vm} nicht lesbar: {exc}")
+
+
 def _inspect(vm: VM, ids: dict) -> dict | None:
     """docker inspect, oder None, wenn ssh scheitert. Das ist kein Bruch nach der Spec, aber
     der Hinweis gehört auf die Konsole: Reagiert die VM nicht mehr, ist das die Antwort."""
@@ -657,9 +688,8 @@ def _access(args, vm: VM | None, facts: dict | None):
         return
     host, port = tunnel_target(os.environ.get("DEPLOY_BIND"), facts["env"])
     with tunnel(vm, host, port) as url:
-        yield url, {"url": url, "vm": True, "tunnel": {
-            "host": vm.ssh[-1], "jump": os.environ.get("DEPLOY_JUMP") or None,
-            "ziel": f"{host}:{port}"}}
+        yield url, {"url": url, "vm": True,
+                    "tunnel": {"host": vm.host, "jump": vm.jump, "ziel": f"{host}:{port}"}}
 
 
 async def _ladder(run: Run, url: str, examples, args, vm: VM | None, ids: dict) -> None:
