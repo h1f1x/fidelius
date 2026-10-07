@@ -111,14 +111,21 @@ def request(stage, start_s, client_ms, *, abschnitt="treppe", beispiel="01_schad
     }
 
 
+TUNNEL = {"url": "http://127.0.0.1:50000", "vm": True,
+          "tunnel": {"host": "felix@dev-vm", "jump": None, "ziel": "127.0.0.1:8080"}}
+CADDY = {"url": "https://fidelius.example", "vm": True, "tunnel": None}
+LOCAL = {"url": "http://localhost:8080", "vm": False, "tunnel": None}
+
+
 def a_run(name, times=None, *, vcpu=8, ram_gib=16, threads=4, requests=(), samples=(),
-          stufen=()) -> dict:
-    """Ein Lauf, wie read_run() ihn liefert. ram_gib=None: ohne VM gemessen."""
+          stufen=(), zugang=None) -> dict:
+    """Ein Lauf, wie read_run() ihn liefert. ram_gib=None: ohne VM gemessen. Ohne zugang lief
+    er über den SSH-Tunnel, ohne VM über --url."""
     return {
         "name": name,
         "run": {"vcpu": vcpu, "ram_bytes": ram_gib * GIB if ram_gib else None,
                 "threads": threads, "zeit": T0.isoformat(timespec="milliseconds"),
-                "stufen": list(stufen)},
+                "stufen": list(stufen), "zugang": zugang or (TUNNEL if ram_gib else LOCAL)},
         "requests": ladder(times or {}) + list(requests),
         "samples": list(samples),
     }
@@ -159,8 +166,20 @@ def test_head_says_why_there_is_no_sweet_spot():
 
     assert ("Kein Sweet Spot: Keine gemessene Größe hält 4 gleichzeitige Prüfungen"
             in Page(report.render([slow, local])).text("kopf"))
-    assert ("Kein Sweet Spot: Kein Lauf kennt die Größe seiner VM"
+    assert ("Kein Sweet Spot: Kein Lauf lief über den SSH-Tunnel auf einer VM bekannter Größe"
             in Page(report.render([local])).text("kopf"))
+
+
+def test_head_names_the_runs_that_do_not_count_for_the_sweet_spot_and_why():
+    tunnel = a_run("lauf-1", {1: [5000] * 3, 4: [15000] * 3})
+    caddy = a_run("caddy", {4: [9000] * 3}, vcpu=4, ram_gib=8, zugang=CADDY)  # kleiner, c* 4
+    local = a_run("lokal", {1: [5000] * 3, 4: [9000] * 3}, vcpu=None, ram_gib=None, threads=None)
+
+    text = Page(report.render([tunnel, caddy, local])).text("kopf")
+
+    assert "Sweet Spot: 8 vCPU, 16,0 GiB RAM" in text
+    assert ("Nicht im Sweet Spot, weil nur Läufe über den SSH-Tunnel zählen: "
+            "caddy (über --url statt SSH-Tunnel), lokal (ohne VM)") in text
 
 
 def test_run_table_shows_size_limits_throughput_and_worst_case_per_run():
@@ -336,7 +355,7 @@ def test_cli_writes_the_report_over_all_runs_in_the_results_directory(tmp_path):
 def test_cli_selects_runs_and_takes_target_request_log_and_output_file(tmp_path):
     results = tmp_path / "loadtest-results"
     write_run(results, "2026-10-07-2000-8cpu-4t", {1: [6000] * 3, 2: [8000] * 3}, vcpu=8,
-              ram_bytes=8 * GIB)
+              ram_bytes=8 * GIB, zugang=TUNNEL)
     write_run(results, "2026-10-07-2100-8cpu-4t-caddy", {4: [9000] * 3})
     write_run(results, "2026-10-08-2000-4cpu-2t", {1: [9000] * 3})
     log = tmp_path / "requests.jsonl"

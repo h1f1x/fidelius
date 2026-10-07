@@ -59,6 +59,7 @@ body { margin: 0; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-ser
 .report .lead { margin: 0 0 12px; font-size: 17px; }
 .hint { margin: 0; color: var(--muted); font-size: 12px; }
 .tile .hint { margin-top: 6px; }
+.report .lead + .hint { margin: -6px 0 12px; }
 .report .kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 10px; margin-bottom: 10px; }
 .report .kpi, .report .tile { background: var(--panel); border: 1px solid var(--border);
@@ -120,7 +121,7 @@ def render(runs: list[dict], target: int = ev.TARGET_LOAD,
 <body><main class="report">
 <section id="kopf"><div class="top"><h1>Lasttest-Bericht</h1>
 <p class="hint">{" · ".join(facts)}</p></div>
-<p class="lead">{_sweet_spot(rows, target)}</p>
+{_sweet_spot(rows, target)}
 <div class="kpis">{_ram_kpi(rows)}{usage}</div>
 <div class="tile">{_run_table(rows)}</div></section>
 {_tile("antwortzeit", "Antwortzeit je Stufe", _response_chart(rows))}
@@ -189,7 +190,7 @@ def _row(run: dict) -> dict:
     meta = run["run"]
     result = ev.evaluate_run(run["requests"], meta.get("stufen") or [], run["samples"])
     return {"name": run["name"], "vcpu": meta.get("vcpu"), "ram_bytes": meta.get("ram_bytes"),
-            "threads": meta.get("threads"), **result,
+            "threads": meta.get("threads"), "zugang": meta.get("zugang"), **result,
             "timeline": ev.timeline(run["samples"], meta.get("stufen") or [], meta.get("zeit"))}
 
 
@@ -200,16 +201,24 @@ def _stage(row: dict, stage: int | None) -> dict | None:
 # ---------- Kopf ----------
 
 def _sweet_spot(rows: list[dict], target: int) -> str:
+    """Der Sweet Spot in einem Satz, darunter die Läufe, die nicht zählen, mit ihrem Grund."""
+    excluded = [(r["name"], reason) for r in rows
+                if (reason := ev.sweet_spot_exclusion(r)) is not None]
+    note = ("" if not excluded else
+            '<p class="hint">Nicht im Sweet Spot, weil nur Läufe über den SSH-Tunnel zählen: '
+            + ", ".join(f"{escape(name)} ({reason})" for name, reason in excluded) + "</p>")
     spot = ev.sweet_spot(rows, target)
     if spot:
-        return (f"<strong>Sweet Spot: {spot['vcpu']} vCPU, {_gib(spot['ram_bytes'])} RAM</strong>"
+        lead = (f"<strong>Sweet Spot: {spot['vcpu']} vCPU, {_gib(spot['ram_bytes'])} RAM</strong>"
                 f" – die kleinste gemessene Größe, die {target} gleichzeitige Prüfungen unter der "
                 f"Komfortgrenze hält (c* = {spot['c_star']}, Lauf {escape(spot['name'])}).")
-    if not any(r["vcpu"] is not None and r["ram_bytes"] is not None for r in rows):
-        return ("<strong>Kein Sweet Spot:</strong> Kein Lauf kennt die Größe seiner VM, alle "
-                "liefen ohne VM.")
-    return (f"<strong>Kein Sweet Spot:</strong> Keine gemessene Größe hält {target} "
-            "gleichzeitige Prüfungen unter der Komfortgrenze.")
+    elif len(excluded) == len(rows):
+        lead = ("<strong>Kein Sweet Spot:</strong> Kein Lauf lief über den SSH-Tunnel auf einer "
+                "VM bekannter Größe.")
+    else:
+        lead = (f"<strong>Kein Sweet Spot:</strong> Keine gemessene Größe hält {target} "
+                "gleichzeitige Prüfungen unter der Komfortgrenze.")
+    return f'<p class="lead">{lead}</p>{note}'
 
 
 def _kpi(label: str, value: str, note: str) -> str:

@@ -42,9 +42,9 @@ run.json:
     abbruch                     null, oder warum der Lauf vorzeitig endete
 
 Schnittstelle: read_run() und read_jsonl() lesen, evaluate_run() wertet einen Lauf aus,
-sweet_spot() und recommended_ram_bytes() wählen über mehrere Läufe, timeline() legt die Messwerte
-der VM für den Bericht auf eine Zeitachse, concurrency() rechnet die echte Nutzung aus dem
-Request-Log der App. Dazu classify(), percentile() und container_breaks(), die das Skript während
+sweet_spot(), sweet_spot_exclusion() und recommended_ram_bytes() wählen über mehrere Läufe,
+timeline() legt die Messwerte der VM für den Bericht auf eine Zeitachse, concurrency() rechnet die
+echte Nutzung aus dem Request-Log der App. Dazu classify(), percentile() und container_breaks(), die das Skript während
 des Laufs braucht. Feldnamen der Ergebnisse sind englisch wie in log_report.py, die der Dateien
 deutsch wie im Request-Log.
 """
@@ -239,12 +239,24 @@ def _breaks(requests: list[dict], metrics: dict) -> list[str]:
 
 def sweet_spot(runs: list[dict], target: int = TARGET_LOAD) -> dict | None:
     """Der Lauf mit der kleinsten Größe (erst vCPU, dann RAM), dessen c* die Ziellast hält, oder
-    None. runs: je Lauf ein dict mit vcpu, ram_bytes (aus run.json) und c_star (aus
-    evaluate_run). Läufe ohne bekannte Größe zählen nicht. Bei gleicher Größe gewinnt das höhere
-    c*, etwa wenn dieselbe VM mit verschiedenen Threads lief."""
-    fitting = [r for r in runs if r.get("vcpu") is not None and r.get("ram_bytes") is not None
+    None. runs: je Lauf ein dict mit zugang, vcpu, ram_bytes (aus run.json) und c_star (aus
+    evaluate_run). Es zählen nur Läufe, für die sweet_spot_exclusion() keinen Grund nennt. Bei
+    gleicher Größe gewinnt das höhere c*, etwa wenn dieselbe VM mit verschiedenen Threads lief."""
+    fitting = [r for r in runs if sweet_spot_exclusion(r) is None
                and r.get("c_star") is not None and r["c_star"] >= target]
     return min(fitting, key=lambda r: (r["vcpu"], r["ram_bytes"], -r["c_star"]), default=None)
+
+
+def sweet_spot_exclusion(run: dict) -> str | None:
+    """Warum ein Lauf nicht in den Sweet Spot eingeht, oder None. Nur Läufe über den SSH-Tunnel
+    messen die App selbst auf einer VM bekannter Größe: Über --url misst ein Lauf auch Caddy
+    oder gar keine VM. run: dict mit zugang, vcpu und ram_bytes wie in run.json."""
+    access = run.get("zugang") or {}
+    if not access.get("tunnel"):
+        return "über --url statt SSH-Tunnel" if access.get("vm") else "ohne VM"
+    if run.get("vcpu") is None or run.get("ram_bytes") is None:
+        return "Größe der VM unbekannt"
+    return None
 
 
 def concurrency(entries) -> dict:

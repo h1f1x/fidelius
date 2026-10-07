@@ -223,21 +223,42 @@ def test_timeline_puts_samples_and_stage_boundaries_on_seconds_since_the_run_sta
     ]
 
 
+TUNNEL = {"url": "http://127.0.0.1:50000", "vm": True,
+          "tunnel": {"host": "felix@dev-vm", "jump": None, "ziel": "127.0.0.1:8080"}}
+CADDY = {"url": "https://fidelius.example", "vm": True, "tunnel": None}
+LOCAL = {"url": "http://localhost:8080", "vm": False, "tunnel": None}
+
+
 def test_sweet_spot_is_smallest_size_by_vcpu_then_ram_that_holds_the_target_load():
     gb = 10 ** 9
     runs = [
-        {"name": "lauf-0", "vcpu": 8, "ram_bytes": 8 * gb, "c_star": 2},
-        {"name": "lauf-1", "vcpu": 8, "ram_bytes": 16 * gb, "c_star": 4},
-        {"name": "lauf-2", "vcpu": 4, "ram_bytes": 16 * gb, "c_star": 1},
-        {"name": "lauf-3", "vcpu": 16, "ram_bytes": 16 * gb, "c_star": 6},
-        {"name": "lauf-4", "vcpu": 16, "ram_bytes": 16 * gb, "c_star": None},
-        {"name": "lokal", "vcpu": None, "ram_bytes": None, "c_star": 8},  # ohne VM: keine Größe
+        {"name": "lauf-0", "vcpu": 8, "ram_bytes": 8 * gb, "c_star": 2, "zugang": TUNNEL},
+        {"name": "lauf-1", "vcpu": 8, "ram_bytes": 16 * gb, "c_star": 4, "zugang": TUNNEL},
+        {"name": "lauf-2", "vcpu": 4, "ram_bytes": 16 * gb, "c_star": 1, "zugang": TUNNEL},
+        {"name": "lauf-3", "vcpu": 16, "ram_bytes": 16 * gb, "c_star": 6, "zugang": TUNNEL},
+        {"name": "lauf-4", "vcpu": 16, "ram_bytes": 16 * gb, "c_star": None, "zugang": TUNNEL},
     ]
 
     assert ev.sweet_spot(runs)["name"] == "lauf-1"  # Ziellast 4
     assert ev.sweet_spot(runs, target=2)["name"] == "lauf-0"
     assert ev.sweet_spot(runs, target=5)["name"] == "lauf-3"
     assert ev.sweet_spot(runs, target=8) is None
+
+
+def test_sweet_spot_counts_only_runs_through_the_ssh_tunnel():
+    gb = 10 ** 9
+    tunnel = {"name": "lauf-1", "vcpu": 8, "ram_bytes": 16 * gb, "c_star": 4, "zugang": TUNNEL}
+    caddy = {"name": "caddy", "vcpu": 4, "ram_bytes": 8 * gb, "c_star": 4, "zugang": CADDY}
+    local = {"name": "lokal", "vcpu": None, "ram_bytes": None, "c_star": 8, "zugang": LOCAL}
+    unknown = {"name": "kaputt", "vcpu": None, "ram_bytes": None, "c_star": 8, "zugang": TUNNEL}
+
+    assert ev.sweet_spot([tunnel, caddy, local, unknown])["name"] == "lauf-1"
+    assert ev.sweet_spot([caddy, local, unknown]) is None
+    assert ev.sweet_spot_exclusion(tunnel) is None
+    assert ev.sweet_spot_exclusion(caddy) == "über --url statt SSH-Tunnel"
+    assert ev.sweet_spot_exclusion(local) == "ohne VM"
+    assert ev.sweet_spot_exclusion(unknown) == "Größe der VM unbekannt"
+    assert ev.sweet_spot_exclusion({"name": "ohne-run-json"}) == "ohne VM"
 
 
 def log_entry(end_s: float, gesamt_ms: int, quelle="anfrage") -> dict:
