@@ -178,6 +178,48 @@ def test_ram_peak_is_highest_memtotal_minus_memavailable_over_all_samples():
     assert ev.evaluate_run([])["ram_peak_bytes"] is None
 
 
+def test_recommended_ram_is_the_highest_peak_over_all_runs_plus_a_quarter():
+    gib = 1024 ** 3
+
+    assert ev.recommended_ram_bytes([6 * gib, None, 8 * gib]) == 10 * gib
+    assert ev.recommended_ram_bytes([None]) is None  # nur Läufe ohne VM
+
+
+def test_timeline_puts_samples_and_stage_boundaries_on_seconds_since_the_run_start():
+    gib = 1024 ** 3
+
+    def at(s):
+        return (T0 + timedelta(seconds=s)).isoformat(timespec="milliseconds")
+
+    def sample(s, app_cpu, steal):
+        return {"zeit": at(s),
+                "container": {"app": {"cpu_pct": app_cpu, "mem_bytes": 3 * gib},
+                              "laya": {"cpu_pct": 98.5, "mem_bytes": 2 * gib}},
+                "cpu_pct": None if steal is None else {"user": 60.0, "idle": 38.5, "steal": steal},
+                "mem_total_bytes": 8 * gib, "mem_available_bytes": 2 * gib}
+    samples = [sample(2, 10.0, None), sample(4.5, 350.0, 1.5),
+               {"zeit": at(6), "container": {"laya": {"cpu_pct": None, "mem_bytes": None}},
+                "cpu_pct": None, "mem_total_bytes": None, "mem_available_bytes": None},
+               {"zeit": "kaputt"}]
+    stages = [{"abschnitt": "treppe", "stufe": 1, "start": at(1), "ende": at(30)},
+              {"abschnitt": "langtext", "stufe": 1, "start": at(30), "ende": None}]
+
+    result = ev.timeline(samples, stages, start=at(0))
+
+    full = {"cpu_pct": {"app": 10.0, "laya": 98.5}, "mem_bytes": {"app": 3 * gib, "laya": 2 * gib},
+            "vm_used_bytes": 6 * gib}
+    assert result["samples"] == [
+        {"t_s": 2.0, **full, "steal_pct": None},
+        {"t_s": 4.5, **full, "cpu_pct": {"app": 350.0, "laya": 98.5}, "steal_pct": 1.5},
+        {"t_s": 6.0, "cpu_pct": {"app": None, "laya": None},
+         "mem_bytes": {"app": None, "laya": None}, "vm_used_bytes": None, "steal_pct": None},
+    ]
+    assert result["stages"] == [
+        {"part": "treppe", "stage": 1, "start_s": 1.0, "end_s": 30.0},
+        {"part": "langtext", "stage": 1, "start_s": 30.0, "end_s": None},
+    ]
+
+
 def test_sweet_spot_is_smallest_size_by_vcpu_then_ram_that_holds_the_target_load():
     gb = 10 ** 9
     runs = [

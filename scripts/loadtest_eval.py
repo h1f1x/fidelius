@@ -42,7 +42,8 @@ run.json:
     abbruch                     null, oder warum der Lauf vorzeitig endete
 
 Schnittstelle: read_run() und read_jsonl() lesen, evaluate_run() wertet einen Lauf aus,
-sweet_spot() wählt über mehrere Läufe, concurrency() rechnet die echte Nutzung aus dem
+sweet_spot() und recommended_ram_bytes() wählen über mehrere Läufe, timeline() legt die Messwerte
+der VM für den Bericht auf eine Zeitachse, concurrency() rechnet die echte Nutzung aus dem
 Request-Log der App. Dazu classify(), percentile() und container_breaks(), die das Skript während
 des Laufs braucht. Feldnamen der Ergebnisse sind englisch wie in log_report.py, die der Dateien
 deutsch wie im Request-Log.
@@ -61,9 +62,11 @@ LONG_TEXT = "langtext"
 COMFORT_P95_MS = 20_000
 TARGET_LOAD = 4
 BREAK_P95_MS = 60_000
+RAM_HEADROOM = 0.25
 
 OK, DEGRADED, FAILED = "ok", "degradiert", "fehlgeschlagen"
 CLASSES = (OK, DEGRADED, FAILED)
+CONTAINERS = ("app", "laya")  # Schlüssel von "container" in samples.jsonl
 
 
 def read_run(directory: str | Path) -> dict:
@@ -151,10 +154,56 @@ def evaluate_run(requests: list[dict], stages: list[dict] = (), samples: list[di
 
 
 def _ram_peak(samples: list[dict]) -> int | None:
-    """Höchste RAM-Belegung der VM, MemTotal − MemAvailable, wie in Spec Abschnitt 3."""
-    used = [s["mem_total_bytes"] - s["mem_available_bytes"] for s in samples
-            if s.get("mem_total_bytes") is not None and s.get("mem_available_bytes") is not None]
-    return max(used, default=None)
+    """Höchste RAM-Belegung der VM über alle Messwerte."""
+    return max((u for s in samples if (u := _vm_used(s)) is not None), default=None)
+
+
+def _vm_used(sample: dict) -> int | None:
+    """RAM-Belegung der VM, MemTotal − MemAvailable, wie in Spec Abschnitt 3."""
+    total, available = sample.get("mem_total_bytes"), sample.get("mem_available_bytes")
+    return None if total is None or available is None else total - available
+
+
+def timeline(samples: list[dict], stages: list[dict] = (), start: str | None = None) -> dict:
+    """Die Messwerte des Samplers über die Zeit, für die Grafik im Bericht. Zeiten in Sekunden
+    seit start (zeit aus run.json), ohne start seit der ersten Stufe oder dem ersten Messwert:
+
+        samples  [{t_s, cpu_pct: {app, laya}, mem_bytes: {app, laya}, vm_used_bytes, steal_pct}]
+                 cpu_pct je Container wie in samples.jsonl (100 = eine CPU voll), vm_used_bytes
+                 wie bei der RAM-Spitze, steal_pct der VM; None, wo ein Wert fehlt
+        stages   [{part, stage, start_s, end_s}] aus "stufen" in run.json, in Laufreihenfolge;
+                 end_s None, wenn die Stufe kein Ende hat (Abbruch)
+
+    Messwerte ohne lesbare zeit fallen heraus.
+    """
+    times = [(t, s) for s in samples if (t := _maybe_time(s.get("zeit"))) is not None]
+    origin = _maybe_time(start)
+    if origin is None:
+        firsts = [t for st in stages if (t := _maybe_time(st.get("start"))) is not None]
+        origin = min(firsts + [t for t, _ in times], default=0.0)
+
+    def since(t):
+        return None if t is None else round(t - origin, 3)
+
+    def per_container(sample, key):
+        container = sample.get("container") or {}
+        return {c: (container.get(c) or {}).get(key) for c in CONTAINERS}
+
+    return {
+        "samples": [{"t_s": since(t), "cpu_pct": per_container(s, "cpu_pct"),
+                     "mem_bytes": per_container(s, "mem_bytes"), "vm_used_bytes": _vm_used(s),
+                     "steal_pct": (s.get("cpu_pct") or {}).get("steal")} for t, s in times],
+        "stages": [{"part": st.get("abschnitt"), "stage": st.get("stufe"),
+                    "start_s": since(_maybe_time(st.get("start"))),
+                    "end_s": since(_maybe_time(st.get("ende")))} for st in stages],
+    }
+
+
+def recommended_ram_bytes(peaks) -> int | None:
+    """Empfohlener RAM nach Spec Abschnitt 3: die höchste RAM-Spitze über alle Läufe (je Lauf
+    ram_peak_bytes aus evaluate_run) plus RAM_HEADROOM; None, wenn kein Lauf eine hat."""
+    peak = max((p for p in peaks if p is not None), default=None)
+    return None if peak is None else round(peak * (1 + RAM_HEADROOM))
 
 
 def _longtext(requests: list[dict], ladder: list[dict]) -> dict | None:
@@ -310,3 +359,10 @@ def _throughput(counted: list[dict]) -> float | None:
 
 def _time(iso: str) -> float:
     return datetime.fromisoformat(iso).timestamp()
+
+
+def _maybe_time(iso) -> float | None:
+    try:
+        return _time(iso)
+    except (TypeError, ValueError):
+        return None
