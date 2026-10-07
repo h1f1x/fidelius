@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from .models import AnalyzeRequest
-from .pipeline import Pipeline
+from .pipeline import CALIBRATION, Pipeline
 
 log = logging.getLogger(__name__)
 
@@ -77,7 +77,7 @@ class Calibration:
 
     def _measure(self, text: str) -> int | None:
         """Gesamtdauer in ms, oder None, wenn Laya fehlte: ohne Laya wäre die Schätzung zu niedrig."""
-        res = self.pipeline.analyze(AnalyzeRequest(text=text, force=True), source="kalibrierung")
+        res = self.pipeline.analyze(AnalyzeRequest(text=text, force=True), source=CALIBRATION)
         if res.gate.note is not None:
             log.warning("Kalibrierung verworfen: %s", res.gate.note)
             return None

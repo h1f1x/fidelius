@@ -25,7 +25,10 @@ Stand: 2026-10-06, Ergebnis einer Klärungsrunde und eines UI-Prototyps. Alle Pu
   - `GET /api/request-log` liefert die Rohdatei als `application/x-ndjson` zum Download. Ohne Log antwortet er mit 404.
 - **Zeitzone:** Tage und Stunden werden im Backend nach Europe/Berlin umgerechnet. Das Log bleibt in UTC.
 - **Kaputte Zeilen:** werden übersprungen. Ihre Zahl steht in der Antwort und oben auf der Seite, auch wenn sie 0 ist.
-- **Quelle:** `quelle: kalibrierung` wird von den Anfragen getrennt. Alle Kennzahlen außer dem Abschnitt Kalibrierung beziehen sich nur auf `quelle: anfrage`.
+- **Quelle:** Als Anfrage zählt nur `quelle: anfrage`. Alle Kennzahlen außer dem Abschnitt Kalibrierung beziehen sich nur darauf.
+  - `quelle: kalibrierung` erscheint nur im Abschnitt Kalibrierung.
+  - `quelle: lasttest` (siehe `docs/specs/lasttest.md`) zählt in keiner Kennzahl mit, damit ein Lasttest die echte Nutzung nicht verfälscht.
+  - Nur der Zeitraum, in dem ein Build im Log auftaucht, rechnet mit allen Quellen.
 - **Perzentile:** werden nach der Nearest-Rank-Methode berechnet. Eine Phase, die bei einer Anfrage nicht lief (Erkennung und Laya bei harmlosem Text ohne „Trotzdem“), zählt für diese Phase nicht mit.
 
 ## 3. Inhalt

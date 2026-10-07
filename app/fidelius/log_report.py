@@ -29,7 +29,7 @@ Antwort von report() bzw. GET /api/report?period=24h|7d|30d|all (Standard 30d):
                      hours: [24 Zahlen], Index = Stunde in Berliner Zeit}
     builds          [{name, number, commit, dirty, first, last, requests, median_ms, p90_ms,
                      per_1000_median_ms, change_vs_previous}], sortiert nach erstem Auftauchen;
-                    name z. B. "#37 · 0d15b11" („*“ = dirty); first/last inkl. Kalibrierung;
+                    name z. B. "#37 · 0d15b11" („*“ = dirty); first/last über alle Quellen;
                     change_vs_previous je 1.000 Zeichen zum letzten Build mit Anfragen davor,
                     bestimmt über das ganze Log, auch außerhalb des Zeitraums
                     (0.2 = 20 % langsamer, negativ = schneller)
@@ -44,6 +44,8 @@ import json
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
+
+from .pipeline import CALIBRATION, REQUEST
 
 # Das Log bleibt in UTC; Tage und Stunden zählen so, wie die Nutzer sie erleben.
 BERLIN = ZoneInfo("Europe/Berlin")
@@ -296,7 +298,7 @@ def _build_name(info) -> str:
 
 def _calibration(entries: list[dict]) -> dict:
     """Gleiche Texte machen Builds direkt vergleichbar; die Zeichenzahl kennzeichnet den Text."""
-    runs = [e for e in entries if e.get("quelle") == "kalibrierung"]
+    runs = [e for e in entries if e.get("quelle") == CALIBRATION]
     texts = sorted({e["zeichen"] for e in runs})
     rows = []
     for name, group in _by_build(runs).items():
@@ -326,7 +328,8 @@ def _between(entries: list[dict], start: datetime, end: datetime) -> list[dict]:
 
 
 def _requests(entries: list[dict]) -> list[dict]:
-    return [e for e in entries if e.get("quelle") != "kalibrierung"]
+    """Nur echte Nutzung; Kalibrierläufe und Lasttests würden die Kennzahlen verfälschen."""
+    return [e for e in entries if e.get("quelle") == REQUEST]
 
 
 def _distribution(values: list) -> dict:
