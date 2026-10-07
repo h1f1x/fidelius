@@ -53,6 +53,23 @@ def test_counts_requests_in_period_and_skips_broken_lines(tmp_path):
     assert result["metrics"]["requests"] == 2
 
 
+def test_load_test_entries_count_neither_as_requests_nor_as_calibration(tmp_path):
+    path = tmp_path / "requests.jsonl"
+    write_log(path,
+              entry(gesamt_ms=100),
+              entry(quelle="lasttest", gesamt_ms=60000,
+                    fehler=" Laya-Bestätigung fehlgeschlagen (HTTPStatusError)."),
+              entry(quelle="kalibrierung", zeichen=515, gesamt_ms=200))
+
+    result = report(path, "30d", now=NOW)
+
+    assert result["metrics"]["requests"] == 1
+    assert result["metrics"]["total_median_ms"] == 100
+    assert result["errors"] == []
+    assert result["calibration"] == {"texts": [515], "rows": [
+        {"build": "#37 · 0d15b11", "runs": 1, "median_ms": [200]}]}
+
+
 def test_key_figures_use_nearest_rank(tmp_path):
     path = tmp_path / "requests.jsonl"
     error = "Laya nicht erreichbar (ConnectError); Gate übersprungen."
