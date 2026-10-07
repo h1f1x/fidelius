@@ -44,8 +44,9 @@ run.json:
 Schnittstelle: read_run() und read_jsonl() lesen, evaluate_run() wertet einen Lauf aus,
 sweet_spot(), sweet_spot_exclusion() und recommended_ram_bytes() wählen über mehrere Läufe,
 timeline() legt die Messwerte der VM für den Bericht auf eine Zeitachse, concurrency() rechnet die
-echte Nutzung aus dem Request-Log der App. Dazu classify(), percentile() und container_breaks(), die das Skript während
-des Laufs braucht. Feldnamen der Ergebnisse sind englisch wie in log_report.py, die der Dateien
+echte Nutzung aus dem Request-Log der App. Dazu classify(), percentile() und container_breaks(),
+die das Skript während des Laufs braucht, sowie num() und gib(), die Zahlen für Konsole und
+Bericht schreiben. Feldnamen der Ergebnisse sind englisch wie in log_report.py, die der Dateien
 deutsch wie im Request-Log.
 """
 from __future__ import annotations
@@ -236,7 +237,7 @@ def _breaks(requests: list[dict], metrics: dict) -> list[str]:
             warmup = sum(bool(r.get("aufwaermen")) for r in hits)
             reasons.append(f"{len(hits)} {c}" + (f" ({warmup} beim Aufwärmen)" if warmup else ""))
     if metrics["p95_ms"] is not None and metrics["p95_ms"] > BREAK_P95_MS:
-        reasons.append("p95 über 60 s")
+        reasons.append(f"p95 über {BREAK_P95_MS // 1000} s")
     return reasons
 
 
@@ -374,6 +375,19 @@ def _throughput(counted: list[dict]) -> float | None:
     window = max(ends) - min(starts)
     finished = sum(r["klasse"] in (OK, DEGRADED) for r in counted)
     return round(finished / window * 60, 2) if window > 0 else None
+
+
+def num(v, digits: int = 1) -> str:
+    """Zahl in deutscher Schreibweise wie in /auswertung (report.js): 1.234,5; None ergibt –.
+    Für die Konsole von loadtest.py und den Bericht."""
+    if v is None:
+        return "–"
+    return f"{v:,.{digits}f}".translate(str.maketrans(",.", ".,"))
+
+
+def gib(n) -> str:
+    """Bytes in GiB mit einer Nachkommastelle: 7,8 GiB; None ergibt –."""
+    return "–" if n is None else f"{num(n / 2 ** 30)} GiB"
 
 
 def _time(iso: str) -> float:

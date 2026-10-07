@@ -72,7 +72,6 @@ CALIBRATION_WAIT_S = 300
 # Pause nach einer fehlgeschlagenen Anfrage. Ist die App weg, kommt der Verbindungsfehler sofort
 # zurück; ohne Pause schickte jeder Nutzer bis zum Ende der Stufe Tausende Anfragen ins Leere.
 FAILED_PAUSE_S = 1
-SERVICES = ("app", "laya")
 HEADERS = {"X-Fidelius-Quelle": ev.LOAD_TEST_SOURCE}
 
 
@@ -255,11 +254,11 @@ def result_dir_name(started: datetime, vcpu: int | None, threads: int | None,
 
 # ---------- VM über ssh ----------
 
-FACTS_SCRIPT = """cd {dir} || exit 1
+FACTS_SCRIPT = f"""cd {{dir}} || exit 1
 echo '@@ nproc'; nproc
 echo '@@ meminfo'; cat /proc/meminfo
 echo '@@ env'; cat .env 2>/dev/null
-echo '@@ inspect'; ids=$(docker compose ps -q app laya </dev/null)
+echo '@@ inspect'; ids=$(docker compose ps -q {" ".join(ev.CONTAINERS)} </dev/null)
 [ -n "$ids" ] && docker inspect $ids </dev/null
 """
 
@@ -576,7 +575,7 @@ def main() -> int:
         if not facts["inspect"]:
             print("  WARNUNG: keine Container app und laya gefunden, Brüche durch Neustart "
                   "bleiben unerkannt.")
-        print(f"  {facts['vcpu']} vCPU, {_gib(facts['ram_bytes'])} RAM, "
+        print(f"  {facts['vcpu']} vCPU, {ev.gib(facts['ram_bytes'])} RAM, "
               f"OMP_NUM_THREADS {facts['threads']} ({facts['threads_quelle']})")
         _warn_threads(facts)
 
@@ -590,7 +589,7 @@ def main() -> int:
             print(f"  WARNUNG: Laya meldet {health.get('laya')!r}")
         config = wait_for_calibration(url)
         build, calibration = config.get("build") or {}, config["calibration"]
-        rate = f"{calibration['rate_ms_per_char']:.2f}".replace(".", ",")
+        rate = ev.num(calibration['rate_ms_per_char'], 2)
         print(f"  Build #{build.get('number')} · {build.get('commit')}"
               f"{'*' if build.get('dirty') else ''}, Kalibrierung "
               f"{calibration['base_ms']:.0f} ms + {rate} ms/Zeichen", flush=True)
@@ -712,21 +711,14 @@ async def _ladder(run: Run, url: str, examples, args, vm: VM | None, ids: dict) 
 # ---------- Konsole ----------
 
 def _s(ms) -> str:
-    return "–" if ms is None else f"{ms / 1000:.1f}".replace(".", ",")
-
-
-def _num(x: float) -> str:
-    return f"{x:.1f}".replace(".", ",")
-
-
-def _gib(n) -> str:
-    return "?" if n is None else f"{n / 2 ** 30:.1f} GiB".replace(".", ",")
+    """Millisekunden als Sekunden mit einer Nachkommastelle, ohne Einheit."""
+    return ev.num(None if ms is None else ms / 1000)
 
 
 def _row_summary(row: dict) -> str:
     c = row["classes"]
     return (f"p50 {_s(row['p50_ms'])} s, p95 {_s(row['p95_ms'])} s, {row['count']} gezählt, "
-            f"{c['ok']} ok, {c['degradiert']} degradiert, {c['fehlgeschlagen']} fehlgeschlagen")
+            + ", ".join(f"{c[k]} {k}" for k in ev.CLASSES))
 
 
 def _warn_threads(facts: dict) -> None:
@@ -747,10 +739,10 @@ def format_table(result: dict) -> str:
     lines = [head, "-" * len(head)]
     for s in result["stages"]:
         c = s["classes"]
-        tp = "–" if s["throughput_per_min"] is None else _num(s["throughput_per_min"])
+        tp = ev.num(s["throughput_per_min"])
         lines.append(f"{s['stage']:>5} {s['count']:>7} {_s(s['p50_ms']):>6} {_s(s['p95_ms']):>6} "
-                     f"{_s(s['max_ms']):>6} {tp:>9} {c['ok']:>4} {c['degradiert']:>5} "
-                     f"{c['fehlgeschlagen']:>6}  {'ja' if s['comfort'] else 'nein':<7}  "
+                     f"{_s(s['max_ms']):>6} {tp:>9} {c[ev.OK]:>4} {c[ev.DEGRADED]:>5} "
+                     f"{c[ev.FAILED]:>6}  {'ja' if s['comfort'] else 'nein':<7}  "
                      f"{', '.join(s['breaks'])}")
     lines.append("")
     lt = result["longtext"]
@@ -765,7 +757,7 @@ def format_table(result: dict) -> str:
     lines.append(f"Bruchstufe: {breaking['stage']}, {', '.join(breaking['breaks'])}"
                  if breaking else "Bruchstufe: keine erreicht")
     if result["ram_peak_bytes"] is not None:
-        lines.append(f"RAM-Spitze der VM: {_gib(result['ram_peak_bytes'])}")
+        lines.append(f"RAM-Spitze der VM: {ev.gib(result['ram_peak_bytes'])}")
     return "\n".join(lines)
 
 

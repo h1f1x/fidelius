@@ -209,7 +209,7 @@ def _sweet_spot(rows: list[dict], target: int) -> str:
             + ", ".join(f"{escape(name)} ({reason})" for name, reason in excluded) + "</p>")
     spot = ev.sweet_spot(rows, target)
     if spot:
-        lead = (f"<strong>Sweet Spot: {spot['vcpu']} vCPU, {_gib(spot['ram_bytes'])} RAM</strong>"
+        lead = (f"<strong>Sweet Spot: {spot['vcpu']} vCPU, {ev.gib(spot['ram_bytes'])} RAM</strong>"
                 f" – die kleinste gemessene Größe, die {target} gleichzeitige Prüfungen unter der "
                 f"Komfortgrenze hält (c* = {spot['c_star']}, Lauf {escape(spot['name'])}).")
     elif len(excluded) == len(rows):
@@ -231,8 +231,8 @@ def _ram_kpi(rows: list[dict]) -> str:
     recommended = ev.recommended_ram_bytes(peaks)
     if recommended is None:
         return _kpi("Empfohlener RAM", "–", "keine Messwerte der VM")
-    return _kpi("Empfohlener RAM", _gib(recommended),
-                f"höchste RAM-Spitze {_gib(max(p for p in peaks if p is not None))} "
+    return _kpi("Empfohlener RAM", ev.gib(recommended),
+                f"höchste RAM-Spitze {ev.gib(max(p for p in peaks if p is not None))} "
                 f"+ {round(ev.RAM_HEADROOM * 100)} %")
 
 
@@ -258,11 +258,11 @@ def _run_table(rows: list[dict]) -> str:
         worst = _stage(row, WORST_CASE_STAGE) or {}
         broken = _stage(row, row["break_stage"])
         cells = [
-            _int(row["vcpu"]), _gib(row["ram_bytes"]), _int(row["threads"]), _int(row["c_star"]),
+            _int(row["vcpu"]), ev.gib(row["ram_bytes"]), _int(row["threads"]), _int(row["c_star"]),
             f'<span title="{escape(", ".join(broken["breaks"]))}">{broken["stage"]}</span>'
             if broken else "keine",
-            _num(at_c_star.get("throughput_per_min")), _ms(worst.get("p95_ms")),
-            _gib(row["ram_peak_bytes"]),
+            ev.num(at_c_star.get("throughput_per_min")), _ms(worst.get("p95_ms")),
+            ev.gib(row["ram_peak_bytes"]),
         ]
         color = f'<i class="dot" style="background:{_color(len(body))}"></i>'
         body.append(f"<tr><td>{color}{escape(row['name'])}</td>"
@@ -325,10 +325,10 @@ def _throughput_chart(rows: list[dict]) -> str:
     lines = [(i, [(s["stage"], s["throughput_per_min"]) for s in r["stages"]], False)
              for i, r in enumerate(rows)]
     hovers = [(s["stage"], (s["throughput_per_min"],),
-               f'{r["name"]} · Stufe {s["stage"]}: {_num(s["throughput_per_min"])} Prüfungen/min')
+               f'{r["name"]} · Stufe {s["stage"]}: {ev.num(s["throughput_per_min"])} Prüfungen/min')
               for r in rows for s in r["stages"]]
     chart = _xy_chart(lines, hovers, _stages(rows), top=max(values) * 1.1,
-                      y_fmt=lambda v: _num(v, 0 if v == int(v) else 1),
+                      y_fmt=lambda v: ev.num(v, 0 if v == int(v) else 1),
                       x_title="gleichzeitige Prüfungen →", height=200)
     return (chart + _legend(rows)
             + '<p class="hint">Fertige Prüfungen (ok und degradiert) je Minute. Bleibt die Linie '
@@ -357,8 +357,8 @@ def _phase_chart(rows: list[dict]) -> str:
             + f'<div class="legendrow">{legend}</div>'
             + '<p class="hint">Mediane je Phase über die gezählten Prüfungen, in denen sie lief: '
             "Erkennung und Laya ohne das harmlose Beispiel, das am Gate endet. Ihre Summe ist "
-            "nicht der Median der Gesamtzeit. Rest ist Client-Zeit minus Serverzeit: Netz, Proxy und "
-            "Warten vor der App.</p>")
+            "nicht der Median der Gesamtzeit. Rest ist Client-Zeit minus Serverzeit: Netz, "
+            "Proxy und Warten vor der App.</p>")
 
 
 def _longtext_chart(rows: list[dict]) -> str:
@@ -524,12 +524,12 @@ def _resource_panel(row: dict) -> str:
     vcpu, total = row["vcpu"], row["ram_bytes"]
     charts = [
         _time_chart(row, "CPU", cpus, stages, end, top=vcpu or peak(cpus),
-                    y_fmt=lambda v: _num(v, 0), cap=f"{vcpu} vCPU" if vcpu else None,
+                    y_fmt=lambda v: ev.num(v, 0), cap=f"{vcpu} vCPU" if vcpu else None,
                     stage_tips=True),
         _time_chart(row, "RAM", ram, stages, end, top=total / 2 ** 30 if total else peak(ram),
-                    y_fmt=lambda v: f"{_num(v, 0)} GiB", cap=_gib(total) if total else None),
+                    y_fmt=lambda v: f"{ev.num(v, 0)} GiB", cap=ev.gib(total) if total else None),
         _time_chart(row, "steal", steal, stages, end, top=max(5, peak(steal)),
-                    y_fmt=lambda v: f"{_num(v, 0)} %", y_ticks=1, height=70, x_labels=True),
+                    y_fmt=lambda v: f"{ev.num(v, 0)} %", y_ticks=1, height=70, x_labels=True),
     ]
     return f'<div class="panel"><h3>{escape(row["name"])}</h3>{"".join(charts)}</div>'
 
@@ -552,7 +552,7 @@ def _time_chart(row, title, lines, stages, end, *, top, y_fmt, cap=None, stage_t
     parts += _y_grid(pad_left, base, inner, ticks, y_fmt)
     if x_labels:
         shown = [m for m in x_ticks if m * 60 <= end]
-        parts += [f'<text x="{sx(m * 60)}" y="{height - 3}" text-anchor="middle">{_num(m, 0)}'
+        parts += [f'<text x="{sx(m * 60)}" y="{height - 3}" text-anchor="middle">{ev.num(m, 0)}'
                   f'{" min" if m == shown[-1] else ""}</text>' for m in shown]
     parts.append(f'<line class="axis" x1="{pad_left}" x2="{PANEL}" y1="{base}" y2="{base}"/>')
     if cap:
@@ -684,36 +684,25 @@ def _empty(text: str) -> str:
     return f'<p class="hint">{text}</p>'
 
 
-# ---------- Zahlen wie in /auswertung (report.js) ----------
+# ---------- Zahlen wie in /auswertung (report.js), dazu ev.num und ev.gib ----------
 
 def _int(v) -> str:
     return "–" if v is None else f"{round(v):,}".replace(",", ".")
 
 
-def _num(v, digits: int = 1) -> str:
-    """Deutsche Schreibweise: 1.234,5"""
-    if v is None:
-        return "–"
-    return f"{v:,.{digits}f}".translate(str.maketrans(",.", ".,"))
-
-
 def _ms(v) -> str:
     if v is None:
         return "–"
-    return f"{round(v)} ms" if v < 1000 else f"{_num(v / 1000)} s"
+    return f"{round(v)} ms" if v < 1000 else f"{ev.num(v / 1000)} s"
 
 
 def _percent(v) -> str:
-    return "–" if v is None else f"{_num(v * 100, 0)} %"
+    return "–" if v is None else f"{ev.num(v * 100, 0)} %"
 
 
 def _seconds(v) -> str:
     """Achsen und Grenzen: ganze Sekunden, "20 s"."""
-    return f"{_num(v / 1000, 0)} s"
-
-
-def _gib(n) -> str:
-    return "–" if n is None else f"{_num(n / 2 ** 30)} GiB"
+    return f"{ev.num(v / 1000, 0)} s"
 
 
 if __name__ == "__main__":
