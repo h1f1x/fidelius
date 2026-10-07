@@ -46,6 +46,16 @@ def test_percentile_uses_nearest_rank_like_the_request_log_report():
     assert ev.percentile([], 95) is None
 
 
+def test_percentile_matches_the_copy_in_the_request_log_report():
+    # loadtest_eval kopiert _percentile, weil die Skripte ohne das Paket laufen; der Test hält
+    # beide Fassungen gleich.
+    from fidelius import log_report
+    samples = [[7], [3, 1], [50, 15, 40, 20, 35], list(range(100, 0, -3)), [5, 5, 5, 9]]
+    for values in samples:
+        for p in (1, 25, 50, 90, 95, 99, 100):
+            assert ev.percentile(values, p) == log_report._percentile(values, p), (values, p)
+
+
 T0 = datetime(2026, 10, 7, 18, 0, tzinfo=UTC)
 
 
