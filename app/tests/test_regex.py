@@ -71,3 +71,35 @@ def test_street_adversarial_input_is_fast():
     hits = detect_regex(attack)
     assert time.perf_counter() - start < 0.1
     assert not any(h.category == "ADRESSE" for h in hits)
+
+
+def test_phone_adversarial_input_is_fast():
+    # Eine Null, ein langer Ziffernlauf und ein Buchstabe dahinter: Das alte Muster probierte
+    # mit seinen optionalen Trennern und dem Lookahead jede Aufteilung der Ziffern durch.
+    attack = "0" + "1" * 30 + "x"
+    start = time.perf_counter()
+    hits = detect_regex(attack)
+    assert time.perf_counter() - start < 0.1
+    assert not any(h.category == "TELEFON" for h in hits)
+
+
+def test_phone_formats():
+    text = (
+        "Ruf an: +49 30 1234567, 0049 30 123 45 67; 030/1234567 oder 030 12 34 56. "
+        "Mobil 0171-1234567,0172-7654321 und +49 40 987654."
+    )
+    phones = {t for c, t in cats(text) if c == "TELEFON"}
+    assert phones == {
+        "+49 30 1234567",
+        "0049 30 123 45 67",
+        "030/1234567",
+        "030 12 34 56",
+        "0171-1234567",
+        "0172-7654321",
+        "+49 40 987654",
+    }
+
+
+def test_phone_needs_clean_edges():
+    r = cats("Code A0301234567, Wert 0301234567x und Nummer 0301234567.5")
+    assert not any(c == "TELEFON" for c, _ in r)

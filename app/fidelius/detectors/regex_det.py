@@ -1,20 +1,25 @@
 """Regex-Erkenner für deterministische Muster: E-Mail, Telefon, IBAN, Datum, Straße, Kennungen."""
 from __future__ import annotations
 
-import re
-
 import re2
 
 from .base import RawHit
 
-# Alle Muster ohne Lookaround laufen auf RE2: kein Backtracking, lineare Laufzeit, also kann
-# kein präparierter Text die Erkennung zum Hängen bringen. Das Telefon-Muster braucht noch
-# Lookarounds, die RE2 nicht kennt, und bleibt bis zu seiner Umstellung auf dem re-Modul.
+# Alle Muster laufen auf RE2: kein Backtracking, lineare Laufzeit, also kann kein präparierter
+# Text die Erkennung zum Hängen bringen. RE2 kennt keine Lookarounds; Ränder werden deshalb als
+# Zeichenklassen mitgematcht, und der eigentliche Treffer liegt in Gruppe 1.
 _EMAIL = re2.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
 
 # Deutsche Telefonformate: +49 30 1234567, 0049 30 123 45 67, 030/1234567, (030) 12 34 56, 0171-1234567
-_PHONE = re.compile(
-    r"(?<![\w.])(?:\+49|0049|\(0\)|0)[\s\-/]?\(?\d{2,5}\)?[\s\-/]?\d{2,}(?:[\s\-/]?\d{1,})*(?!\w)(?!\.\d)"
+# Vor der Nummer steht kein Wortzeichen und kein Punkt, dahinter kein Wortzeichen und kein Punkt
+# mit Ziffer; sonst läse sich das Datum „12.10.2026“ als Nummer. \pZ deckt geschützte Leerzeichen
+# ab, die RE2s ASCII-\s nicht kennt.
+_PHONE_SEP = r"[\s\pZ\-/]"
+_PHONE = re2.compile(
+    r"(?:^|[^\pL\pN_.])"
+    r"((?:\+49|0049|\(0\)|0)" + _PHONE_SEP + r"?\(?\d{2,5}\)?" + _PHONE_SEP + r"?\d{2,}"
+    r"(?:" + _PHONE_SEP + r"?\d+)*)"
+    r"(?:$|[^\pL\pN_.]|\.(?:$|\D))"
 )
 
 _IBAN = re2.compile(r"\b[A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]{4}){2,7}(?:[ ]?[A-Z0-9]{1,4})?\b")
@@ -71,8 +76,8 @@ def _iban_valid(s: str) -> bool:
 
 
 def _phone_valid(s: str) -> bool:
-    digits = re.sub(r"\D", "", s)
-    return 7 <= len(digits) <= 15
+    digits = sum(ch.isdecimal() for ch in s)
+    return 7 <= digits <= 15
 
 
 def detect_regex(text: str) -> list[RawHit]:
@@ -107,10 +112,15 @@ def detect_regex(text: str) -> list[RawHit]:
         add(m.start(1), m.end(1), "KENNUNG", "plate")
     # Telefon zuletzt, damit Daten/IBAN/Kennungen, die wie Nummern aussehen, Vorrang haben.
     taken = [(h.start, h.end) for h in hits]
-    for m in _PHONE.finditer(text):
-        if not _phone_valid(m.group()):
+    # Der Rand hinter einer Nummer kann der Rand vor der nächsten sein („030 1234567,040 7654321“).
+    # finditer würde ihn verbrauchen, darum geht die Suche hinter Gruppe 1 weiter.
+    pos = 0
+    while (m := _PHONE.search(text, pos)) is not None:
+        s, e = m.span(1)
+        pos = e
+        if not _phone_valid(text[s:e]):
             continue
-        if any(m.start() < e and s < m.end() for s, e in taken):
+        if any(s < te and ts < e for ts, te in taken):
             continue
-        add(m.start(), m.end(), "TELEFON", "phone")
+        add(s, e, "TELEFON", "phone")
     return hits
