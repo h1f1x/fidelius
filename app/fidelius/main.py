@@ -9,7 +9,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import build_info, config
+from . import build_info, config, log_report
 from .calibration import Calibration
 from .detectors import gliner, spacy_det
 from .models import AnalyzeRequest, AnalyzeResponse, ApplyRequest, ApplyResponse
@@ -121,9 +121,31 @@ def apply(req: ApplyRequest) -> ApplyResponse:
     return ApplyResponse(entities=entities, anonymized_text=anonymized, mapping=mapping)
 
 
+@app.get("/api/report")
+def get_report(period: str = "30d") -> dict:
+    """Fehlt das Log, kommt trotzdem eine Antwort mit log.present = false und dem Pfad."""
+    try:
+        return log_report.report(config.REQUEST_LOG, period)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.get("/api/request-log")
+def get_request_log() -> FileResponse:
+    p = Path(config.REQUEST_LOG)
+    if not p.is_file():
+        raise HTTPException(404, f"Kein Request-Log vorhanden ({p})")
+    return FileResponse(p, media_type="application/x-ndjson", filename="requests.jsonl")
+
+
 @app.get("/")
 def index() -> FileResponse:
     return FileResponse(STATIC / "index.html")
+
+
+@app.get("/auswertung")
+def report_page() -> FileResponse:
+    return FileResponse(STATIC / "report.html")
 
 
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
