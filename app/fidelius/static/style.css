@@ -1,9 +1,14 @@
 :root {
   --bg: #f6f7f9; --panel: #fff; --text: #1f2933; --muted: #6b7280; --border: #d9dee5;
   --primary: #1f5fbf; --primary-text: #fff; --danger: #c0392b; --done: #1b8a3c;
+  /* Reihen in Diagrammen (Builds, Phasen) und Markierungen wie Median/p90. */
+  --c1: #1f5fbf; --c2: #e4572e; --c3: #29a36a; --c4: #a05cd6; --c5: #d08a10; --c6: #17a2b8; --c7: #888;
+  --mark: #e4572e; --worse: var(--danger); --better: var(--done);
 }
 @media (prefers-color-scheme: dark) {
-  :root { --bg: #14171c; --panel: #1d2127; --text: #e6e8eb; --muted: #9aa3ad; --border: #343a43; --primary: #4f8df7; }
+  :root { --bg: #14171c; --panel: #1d2127; --text: #e6e8eb; --muted: #9aa3ad; --border: #343a43; --primary: #4f8df7;
+    --c1: #4f8df7; --c2: #f07050; --c3: #3fc283; --c4: #b884ee; --c5: #f0b850; --c6: #3cc4da; --c7: #9aa3ad;
+    --mark: #f07050; --worse: #ef6b5b; --better: #3fbf6a; }
 }
 * { box-sizing: border-box; }
 body { margin: 0; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
@@ -140,3 +145,33 @@ mark.ent.chip s { text-decoration: line-through; color: var(--text); font-weight
 .stage > section { margin-top: 8px; }
 .stage.closed > section { display: none; }
 .stage.active > section { border-color: var(--primary); }
+
+/* Auswertung des Request-Logs (/auswertung): Kennzahlen-Cockpit. */
+.report { max-width: 1400px; margin: 0 auto; padding: 0 20px 20px; }
+.report .top { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 14px 0; }
+.report .top h1 { margin: 0; font-size: 20px; }
+.report .top a { color: var(--primary); }
+.report .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 12px; }
+.report .kpi, .report .tile { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; }
+.report .kpi { padding: 12px 14px; }
+.report .kpi .k { font-size: 12px; color: var(--muted); }
+.report .kpi .v { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.report .kpi .t { font-size: 12px; margin-top: 2px; }
+.report .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: 10px; }
+.report .tile { padding: 12px; min-width: 0; overflow-x: auto; }
+.report .tile h2 { margin-bottom: 8px; font-size: 14px; }
+.report .tile.wide { grid-column: 1 / -1; }
+.report .empty { padding: 14px; }
+.report .empty code { background: var(--bg); padding: 0 4px; border-radius: 3px; }
+.report td.num, .report th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.report .worse { color: var(--worse); }
+.report .better { color: var(--better); }
+.report .legendrow { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11px; color: var(--muted); margin-top: 4px; }
+.report .legendrow i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; vertical-align: -1px; }
+svg.chart { width: 100%; height: auto; display: block; overflow: visible; }
+svg.chart text { fill: var(--muted); font: 10px system-ui, sans-serif; }
+svg.chart text.mark { fill: var(--mark); }
+svg.chart .bar { fill: var(--primary); }
+svg.chart .axis { stroke: var(--border); }
+svg.chart .ref { stroke: var(--mark); stroke-dasharray: 3 3; }
+.report i.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
