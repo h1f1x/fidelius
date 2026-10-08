@@ -41,10 +41,12 @@ Compose v2. Der ssh-Benutzer muss Docker ohne `sudo` nutzen dürfen (Gruppe `doc
 
 ## Zugang
 
-Die App hat keinen Login, den Schutz übernimmt der Reverse-Proxy. Deshalb sollte Port 8080 nur
-für den Proxy erreichbar sein. Am engsten ist `DEPLOY_BIND` mit der Adresse des Interfaces, über
-das der Proxy kommt. `0.0.0.0` öffnet den Port auf jedem Interface der VM; das passt nur, wenn
-eine Firewall ihn für alles außer dem Proxy sperrt.
+Die App hat keinen Login, den Schutz übernimmt der Reverse-Proxy. Kommt dort eine Anmeldung dazu,
+prüft sie nur, ob jemand zum GDV gehört, und gibt keine Identität an die App weiter (#19,
+[ki-systembeschreibung.md](ki-systembeschreibung.md)). Port 8080 sollte nur für den Proxy
+erreichbar sein. Am engsten ist `DEPLOY_BIND` mit der Adresse des Interfaces, über das der Proxy
+kommt. `0.0.0.0` öffnet den Port auf jedem Interface der VM; das passt nur, wenn eine Firewall ihn
+für alles außer dem Proxy sperrt.
 
 Unabhängig davon lehnt die App zu große Anfragen ab: Texte über `MAX_TEXT_CHARS` Zeichen,
 Request-Bodys über 2 MB und mehr als 2000 Stellen auf einmal.
