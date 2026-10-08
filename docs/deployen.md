@@ -18,18 +18,23 @@ Compose v2. Der ssh-Benutzer muss Docker ohne `sudo` nutzen dürfen (Gruppe `doc
 | `DEPLOY_BIND` | – | Adresse, auf der die App auf der VM lauscht; beim ersten Deploy Pflicht |
 | `DEPLOY_DIR` | `fidelius` | Verzeichnis auf der VM, relativ zum Home oder absolut |
 | `WAIT_TIMEOUT` | `1800` | Sekunden, die Compose auf gesunde Container wartet |
+| `DEPLOY_ALLOW_DIRTY` | – | `1` deployt auch nicht committete Änderungen, sonst bricht das Skript ab |
 
 ## Was passiert
 
-1. rsync überträgt alles außer `.git` und dem, was `.gitignore` ausschließt (`.envrc`, `.env`,
-   `.venv`, Caches). Deployt wird der Arbeitsstand, auch nicht committete Änderungen; das Skript
-   zeigt an, welcher Commit es ist und ob Änderungen dazukommen. Dateien, die lokal nicht mehr
-   existieren, löscht rsync auch auf der VM.
-2. Ist `DEPLOY_BIND` gesetzt, schreibt das Skript den Wert als `APP_BIND` in die `.env` im
+1. Das Skript bricht ab, wenn `git status` nicht committete oder nicht verfolgte Dateien zeigt,
+   außer mit `DEPLOY_ALLOW_DIRTY=1`. Dann laufen die Unit-Tests (`make test`); schlagen sie fehl,
+   geht nichts auf die VM. So entspricht der Stand auf der VM einem getesteten Commit, und eine
+   Änderung daran, was die App protokolliert, fällt auf (siehe
+   [ki-systembeschreibung.md](ki-systembeschreibung.md)).
+2. rsync überträgt alles außer `.git` und dem, was `.gitignore` ausschließt (`.envrc`, `.env`,
+   `.venv`, Caches). Das Skript zeigt an, welcher Commit es ist und ob Änderungen dazukommen.
+   Dateien, die lokal nicht mehr existieren, löscht rsync auch auf der VM.
+3. Ist `DEPLOY_BIND` gesetzt, schreibt das Skript den Wert als `APP_BIND` in die `.env` im
    Verzeichnis auf der VM. Fehlt beides, bricht es ab, denn einen Default gibt es bewusst nicht
    (siehe Zugang). Andere Zeilen der `.env` bleiben unangetastet; dort lassen sich auch die
    Variablen aus `.envrc.example` setzen (ohne `export`).
-3. `docker compose up --build -d --wait` baut und startet beide Container und kommt zurück, wenn
+4. `docker compose up --build -d --wait` baut und startet beide Container und kommt zurück, wenn
    beide gesund sind. Der erste Start lädt den Laya-Checkpoint und kann einige Minuten dauern.
    Den Git-Stand bekommt das App-Image als Build-Args mit; die Fußzeile der UI zeigt Version,
    Build-Nummer und Commit, auch ob nicht committete Änderungen dabei waren.
