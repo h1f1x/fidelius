@@ -28,7 +28,7 @@ def client(tmp_path, monkeypatch):
     # Feste Uhr: Alle Dauern sind 0, damit sich Antworten vergleichen lassen.
     monkeypatch.setattr(main, "pipeline", Pipeline(laya=HarmlessLaya(), detectors=[],
                                                    clock=lambda: 0.0, log_path=log_path))
-    # Ohne Context-Manager, damit der Startup-Hook keine Modelle lädt.
+    # Ohne Context-Manager, damit der Lifespan keine Modelle lädt.
     return TestClient(app)
 
 
