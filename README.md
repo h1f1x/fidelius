@@ -116,7 +116,8 @@ make test
 
 `make loadtest` misst, wie die App auf gleichzeitige Prüfungen reagiert: eine Treppe von 1 bis 20
 gleichzeitigen Prüfungen, bis die Antwortzeiten die Bruchgrenze überschreiten. Methode und
-Bewertung stehen in [docs/specs/lasttest.md](docs/specs/lasttest.md).
+Bewertung stehen in [docs/specs/lasttest.md](docs/specs/lasttest.md), das Ergebnis der Messreihe auf
+der Dev-VM in [docs/lasttest.md](docs/lasttest.md).
 
 ```bash
 make loadtest                        # Dev-VM per SSH-Tunnel, Variablen wie bei make deploy

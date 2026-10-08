@@ -1,6 +1,6 @@
 # Spec: Lasttest und VM-Größe
 
-Stand: 2026-10-07, Ergebnis einer Klärungsrunde. Alle Punkte sind entschieden, umgesetzt ist noch nichts. Issue: [#22](https://github.com/h1f1x/fidelius/issues/22).
+Stand: 2026-10-08. Umgesetzt mit #27, gemessen mit #26, Ergebnis in [docs/lasttest.md](../lasttest.md). Issue: [#22](https://github.com/h1f1x/fidelius/issues/22).
 
 ## Ziel
 
