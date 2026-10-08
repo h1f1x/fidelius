@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Header, HTTPException, Request
@@ -18,18 +20,22 @@ from .pipeline import LOAD_TEST, REQUEST, Pipeline
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger(__name__)
 
-app = FastAPI(title="PII-Anonymisierung vor dem Prompting", version=build_info.version())
 pipeline = Pipeline(log_path=config.REQUEST_LOG)
 calibration = Calibration(pipeline, config.EXAMPLES_DIR)
 STATIC = Path(__file__).parent / "static"
 
 
-@app.on_event("startup")
-def _warmup() -> None:
+@asynccontextmanager
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     gliner.warmup()
     spacy_det.warmup()
     log.info("Modelle geladen.")
     calibration.start()
+    yield
+
+
+app = FastAPI(title="PII-Anonymisierung vor dem Prompting", version=build_info.version(),
+              lifespan=lifespan)
 
 
 @app.middleware("http")
