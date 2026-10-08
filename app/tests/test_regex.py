@@ -119,7 +119,7 @@ def test_many_candidates_stay_linear(unit):
 def test_phone_formats():
     text = (
         "Ruf an: +49 30 1234567, 0049 30 123 45 67; 030/1234567 oder 030 12 34 56. "
-        "Mobil 0171-1234567,0172-7654321 und +49 40 987654."
+        "Mobil 0171-1234567,0172-7654321 und +49 40 987654. Büro (0171) 7654321."
     )
     phones = {t for c, t in cats(text) if c == "TELEFON"}
     assert phones == {
@@ -130,7 +130,25 @@ def test_phone_formats():
         "0171-1234567",
         "0172-7654321",
         "+49 40 987654",
+        "(0171) 7654321",
     }
+
+
+# Die öffnende Klammer gehört zur Vorwahl, nicht zum Rand davor; sonst bliebe sie beim Ersetzen
+# verwaist stehen. Das gilt auch, wenn Punkt oder Buchstabe direkt davor stehen.
+@pytest.mark.parametrize(
+    "text, phone",
+    [
+        ("(030) 12 34 56", "(030) 12 34 56"),
+        ("Tel.(030) 1234567", "(030) 1234567"),
+        ("Tel(030) 1234567", "(030) 1234567"),
+        ("x(030) 1234567", "(030) 1234567"),
+        # Ohne schließende Klammer bleibt die öffnende draußen, wie bisher.
+        ("Tel (030 1234567", "030 1234567"),
+    ],
+)
+def test_phone_area_code_in_parentheses(text, phone):
+    assert {t for c, t in cats(text) if c == "TELEFON"} == {phone}
 
 
 def test_phone_needs_clean_edges():

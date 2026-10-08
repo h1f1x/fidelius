@@ -82,7 +82,8 @@ _EMAIL = re2.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
 
 # Deutsche Telefonformate: +49 30 1234567, 0049 30 123 45 67, 030/1234567, (030) 12 34 56,
 # 0171-1234567. Davor kein Wortzeichen und kein Punkt, dahinter kein Wortzeichen und kein Punkt
-# mit Ziffer; sonst läse sich das Datum „12.10.2026“ als Nummer.
+# mit Ziffer; sonst läse sich das Datum „12.10.2026“ als Nummer. Die öffnende Klammer vor einer
+# Vorwahl wie „(030)“ holt _phone_start nach.
 _PHONE_SEP = f"[{_SPACE_CHARS}\\-/]"
 _PHONE = _bounded(
     r"(?:\+49|0049|\(0\)|0)" + _PHONE_SEP + r"?\(?\d{2,5}\)?" + _PHONE_SEP + r"?\d{2,}"
@@ -167,6 +168,19 @@ def _street_end(text: str, e: int) -> int:
     return e
 
 
+def _phone_start(text: str, s: int, e: int) -> int:
+    """Nimmt die öffnende Klammer einer Vorwahl wie „(030) 1234567“ in den Treffer.
+
+    Das Muster beginnt mit der Vorwahl, die Klammer davor zählt als Rand. Den Rand bildet sie aber
+    nur, wenn vor ihr kein Punkt oder Wortzeichen steht, bei „Tel.(030)“ also nicht. Gehört sie zur
+    ersten schließenden Klammer im Treffer, rückt der Anfang hier vor, egal was vor ihr steht.
+    """
+    close = text.find(")", s, e)
+    if s > 0 and text[s - 1] == "(" and close != -1 and "(" not in text[s:close]:
+        return s - 1
+    return s
+
+
 def _merged(spans: list[tuple[int, int]]) -> list[tuple[int, int]]:
     merged: list[tuple[int, int]] = []
     for s, e in sorted(spans):
@@ -216,6 +230,7 @@ def detect_regex(text: str) -> list[RawHit]:
     for s, e in _spans(_PHONE, text, raw):
         if not _phone_valid(text[s:e]):
             continue
+        s = _phone_start(text, s, e)
         i = bisect_right(taken_ends, s)  # erster belegter Bereich, der hinter s endet
         if i < len(taken) and taken[i][0] < e:
             continue
