@@ -52,12 +52,21 @@ Stufe 4 und zählt nicht für den Sweet Spot.
 - **Worst Case:** Klicken alle 10 Nutzer gleichzeitig, wartet jeder auf 16 vCPU rund 20 s, auf
   8 vCPU rund 50 s.
 
-## Offen
+## Bewusst ausgelassen
 
 - **8 vCPU mit 8 Threads** ist nicht gemessen. Die Regel vCPU/2 rät davon ab, weil sich App und
-  Laya die Kerne teilen. Weil die Zeit fast nur in Laya steckt, könnte es trotzdem reichen.
-- **Architektur-Hebel:** Der Durchsatz bleibt je Größe flach über die Treppe. Ob daraus ein
-  eigenes Issue wird (mehrere Laya-Instanzen, größerer Detektor-Pool), ist noch nicht entschieden.
+  Laya die Kerne teilen. Mit 16 vCPU ist die Frage beantwortet, die kleinere Größe wäre nur
+  eine Einsparung.
+- **Architektur-Hebel** werden kein eigenes Issue. Die Ziellast hält mit c* = 8 doppelte Reserve.
+  Mehrere Laya-Instanzen teilen sich dieselben Kerne, und eine Inferenz skaliert schon gut mit
+  den Threads. Ein größerer Detektor-Pool trifft nicht den Engpass, die Erkennung braucht unter
+  1 s.
+
+## Beobachten
+
+- **Langtext:** Ein langer Text belegt Laya rund 50 s, alle anderen warten dahinter. Ob das im
+  Betrieb stört, zeigt das Request-Log: `make loadtest-report ARGS="--request-log …"` rechnet
+  die echte Gleichzeitigkeit aus. Erst dann lohnt eine eigene Laya-Instanz für lange Texte.
 
 ## Abweichungen von der Spec
 
