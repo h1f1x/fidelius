@@ -29,4 +29,6 @@ COPY fidelius ./fidelius
 ARG BUILD_NUMBER= BUILD_COMMIT= BUILD_DIRTY= BUILD_TIME=
 ENV BUILD_NUMBER=$BUILD_NUMBER BUILD_COMMIT=$BUILD_COMMIT BUILD_DIRTY=$BUILD_DIRTY BUILD_TIME=$BUILD_TIME
 EXPOSE 8080
-CMD ["uvicorn", "fidelius.main:app", "--host", "0.0.0.0", "--port", "8080"]
+# Ohne Access-Log: Es enthielte Client-Adressen und Zeitpunkte, die App braucht es nicht
+# (docs/ki-systembeschreibung.md). Fehler und Warnungen loggt uvicorn weiter.
+CMD ["uvicorn", "fidelius.main:app", "--host", "0.0.0.0", "--port", "8080", "--no-access-log"]
