@@ -8,6 +8,7 @@
 # DEPLOY_JUMP Jumphost, über den ssh die VM erreicht, wie bei ssh -J (Default: keiner)
 # DEPLOY_BIND Adresse, auf der die App auf der VM lauscht; Pflicht, solange die .env dort keine nennt
 # DEPLOY_DIR  Verzeichnis auf der VM, relativ zum Home oder absolut (Default: fidelius)
+# DEPLOY_ALLOW_DIRTY=1 deployt auch nicht committete Änderungen (Default: Abbruch)
 set -euo pipefail
 
 : "${DEPLOY_HOST:?DEPLOY_HOST fehlt, z. B. DEPLOY_HOST=user@vm scripts/deploy.sh}"
@@ -19,11 +20,22 @@ WAIT_TIMEOUT=${WAIT_TIMEOUT:-1800}
 
 cd "$(dirname "$0")/.."
 
+# Auf der VM fehlt .git, deshalb kommt der Build-Stand von hier. Die Werte enthalten keine
+# Leerzeichen oder Sonderzeichen und gehen unverändert durch die Remote-Shell.
+build_env=$(scripts/build-info.sh | tr '\n' ' ')
+
+# Was auf die VM geht, soll einem Commit entsprechen und die Tests bestanden haben. Sonst ließe
+# sich unbemerkt ändern, was die App protokolliert (docs/ki-systembeschreibung.md).
+if [[ $build_env == *BUILD_DIRTY=1* && ${DEPLOY_ALLOW_DIRTY:-} != 1 ]]; then
+  echo "Nicht committete Änderungen, siehe git status. Erst committen oder bewusst mit DEPLOY_ALLOW_DIRTY=1 deployen."
+  exit 1
+fi
+make --no-print-directory test
+
 # ssh und rsync gehen beide über den Jumphost, falls einer gesetzt ist.
 ssh_cmd="ssh${DEPLOY_JUMP:+ -J $DEPLOY_JUMP}"
 remote() { $ssh_cmd "$DEPLOY_HOST" "$@"; }
 
-# Deployt wird der Arbeitsstand, auch was nicht committet ist.
 echo "Deploye $(git describe --always --dirty=' mit nicht committeten Änderungen') nach $DEPLOY_HOST:$DEPLOY_DIR${DEPLOY_JUMP:+ über $DEPLOY_JUMP}"
 
 # Die Werte kommen von hier und sollen lokal expandieren; printf %q schützt sie für die Remote-Shell.
@@ -34,7 +46,4 @@ remote "command -v rsync >/dev/null || { echo 'rsync fehlt auf der VM.'; exit 1;
 # die .env auf der VM stehen, während --delete alles andere auf den lokalen Stand bringt.
 rsync -az --delete --exclude=.git --exclude-from=.gitignore -e "$ssh_cmd" ./ "$DEPLOY_HOST:$remote_dir/"
 
-# Auf der VM fehlt .git, deshalb kommt der Build-Stand von hier. Die Werte enthalten keine
-# Leerzeichen oder Sonderzeichen und gehen unverändert durch die Remote-Shell.
-build_env=$(scripts/build-info.sh | tr '\n' ' ')
 remote "env $build_env bash -s -- $remote_dir $(printf '%q ' "$WAIT_TIMEOUT" "$DEPLOY_BIND")" < scripts/remote-deploy.sh

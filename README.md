@@ -53,7 +53,9 @@ GLiNER2-PII und spaCy bereits im Image. Danach läuft alles ohne Internet (`HF_H
 | `laya` | 8000 (nur im Compose-Netz) | Laya-Server, multilingualer Checkpoint |
 
 Für Cloud oder On-Premise: beide Images bauen, `app` hinter einen Reverse-Proxy mit TLS und
-Authentifizierung legen. Die App selbst hat keinen Login. Auf eine VM mit ssh-Zugang deployt
+Authentifizierung legen. Die Anmeldung prüft nur die Zugehörigkeit und gibt keine Identität an die
+App weiter (siehe [docs/ki-systembeschreibung.md](docs/ki-systembeschreibung.md)). Die App selbst
+hat keinen Login. Auf eine VM mit ssh-Zugang deployt
 `make deploy DEPLOY_HOST=user@vm`, siehe [docs/deployen.md](docs/deployen.md).
 
 ## Bedienung
@@ -140,6 +142,14 @@ make loadtest-report ARGS="--request-log requests.jsonl"   # echte Gleichzeitigk
 ```
 
 Das Request-Log kommt über `/api/request-log` von der laufenden App.
+
+## Protokolle und Betriebsvereinbarung
+
+Die App schreibt je Prüfung eine Zeile mit Zahlen und Schaltern ins Request-Log, ohne Text, Treffer
+und Netzadresse. uvicorn schreibt kein Access-Log, und die Container-Logs sind auf 3 × 10 MB je
+Dienst begrenzt. Warum fidelius damit nicht zur Leistungs- und Verhaltenskontrolle geeignet ist,
+steht in [docs/ki-systembeschreibung.md](docs/ki-systembeschreibung.md). Änderungen daran, was die
+App protokolliert, gelten dort als wesentliche Änderung und gehen vorher an die KI-Arbeitsgruppe.
 
 ## Stellschrauben
 

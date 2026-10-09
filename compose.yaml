@@ -1,3 +1,10 @@
+# Container-Logs nach Größe begrenzen. Ohne Grenze behält json-file alles bis zum nächsten Deploy.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   laya:
     build:
@@ -17,6 +24,7 @@ services:
       HF_HUB_OFFLINE: "${HF_HUB_OFFLINE:-0}"
     volumes:
       - laya-model-cache:/home/laya/.cache/huggingface
+    logging: *logging
     init: true
     restart: unless-stopped
     healthcheck:
@@ -52,6 +60,7 @@ services:
       - ./examples:/opt/examples:ro
       # Request-Log; überdauert Deploys, make down (ohne -v) lässt es stehen.
       - request-log:/var/log/fidelius
+    logging: *logging
     depends_on:
       laya:
         condition: service_healthy

@@ -1,6 +1,6 @@
 [project]
 name = "fidelius"
-version = "0.1.0"
+version = "0.3.0"
 description = "Lokale Anonymisierung von E-Mails vor dem Prompting: GLiNER2-PII + spaCy + Regex, bestätigt durch Laya"
 requires-python = ">=3.12"
 dependencies = [
@@ -17,7 +17,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.6"]
+dev = ["pytest>=8", "ruff>=0.6", "httpx2>=2.13"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
