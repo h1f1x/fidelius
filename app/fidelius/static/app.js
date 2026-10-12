@@ -443,7 +443,12 @@
   $("infoToggle").onclick = (e) => { e.preventDefault(); $("info").classList.toggle("hidden"); };
   $("example").onchange = async (e) => {
     if (!e.target.value) return;
-    try { const ex = await api("/api/examples/" + encodeURIComponent(e.target.value)); $("text").value = ex.text; run(false); }
+    try { const ex = await api("/api/examples/" + encodeURIComponent(e.target.value));
+      // PROTOTYP: window.exampleProto (prototype-example-confirm.js) fragt bei ?beispiel= vorher nach.
+      const p = window.exampleProto;
+      if (p && !(await p.confirm(ex, e.target.selectedOptions[0].textContent, $("text").value))) { e.target.value = e.target.dataset.prev || ""; return; }
+      e.target.dataset.prev = e.target.value;
+      $("text").value = ex.text; run(false); }
     catch (err) { showError("Das Beispiel konnte nicht geladen werden: " + err.message); }
   };
   // Eingefügter Text wird sofort geprüft; getippter Text erst auf Knopfdruck. Jede Änderung verwirft das alte Ergebnis.
