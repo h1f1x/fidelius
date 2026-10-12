@@ -38,6 +38,14 @@
   }
   function showError(msg) { const e = $("error"); if (!msg) { e.classList.add("hidden"); return; } e.textContent = msg; e.classList.remove("hidden"); }
   async function copy(text, msg) { try { await navigator.clipboard.writeText(text); toast(msg); return true; } catch { toast("Kopieren nicht möglich, bitte Text manuell markieren."); return false; } }
+  // Der Button zeigt zwei Sekunden lang, dass kopiert wurde. Die Breite bleibt, damit die Kopfzeile nicht springt.
+  function confirmCopied(btn) {
+    btn.dataset.label ??= btn.textContent;
+    btn.style.minWidth = btn.offsetWidth + "px";
+    btn.textContent = "✓ Kopiert"; btn.classList.add("copied");
+    clearTimeout(btn.copiedTimer);
+    btn.copiedTimer = setTimeout(() => { btn.textContent = btn.dataset.label; btn.classList.remove("copied"); btn.style.minWidth = ""; }, 2000);
+  }
   function save() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch {} }
   function load() { try { const s = JSON.parse(localStorage.getItem(STORAGE_KEY)); if (s && s.text) state = s; } catch {} }
   async function api(path, body, signal) {
@@ -453,9 +461,10 @@
   }, 0));
   document.addEventListener("click", (e) => { if (!e.target.closest("#popover") && !e.target.closest("mark.ent")) closePopover(); });
   document.addEventListener("click", (e) => {
-    if (!e.target.closest("#copyAnon")) return;
+    const btn = e.target.closest("#copyAnon");
+    if (!btn) return;
     copy(state.anonymized || "", "Anonymisierter Text kopiert. Er enthält keine Markierungen und keine Originale.")
-      .then((ok) => { if (ok && state.anonymized) { state.copied = true; save(); renderSteps(); } });
+      .then((ok) => { if (ok && state.anonymized) { state.copied = true; save(); renderSteps(); confirmCopied(btn); } });
   });
   $("exportMap").onclick = exportMapping;
   $("importMap").onchange = (e) => { if (e.target.files[0]) importMapping(e.target.files[0]); e.target.value = ""; };

@@ -44,6 +44,7 @@ select, input[type=range] { max-width: 100%; }
 button { padding: 7px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel); color: var(--text); cursor: pointer; font-size: 13px; }
 button:hover { border-color: var(--primary); }
 button.primary { background: var(--primary); color: var(--primary-text); border-color: var(--primary); }
+button.primary.copied { background: var(--done); border-color: var(--done); }
 button.ghost { background: transparent; }
 button:disabled { opacity: .5; cursor: progress; }
 .filebtn { padding: 7px 12px; border-radius: 6px; border: 1px solid var(--border); cursor: pointer; }
