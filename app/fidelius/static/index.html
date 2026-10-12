@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sensible Inhalte für ChatGPT ersetzen</title>
-<link rel="stylesheet" href="/static/style.css?v=19">
+<link rel="stylesheet" href="/static/style.css?v=20">
 </head>
 <body>
 <header>
@@ -95,6 +95,20 @@
 
 <div id="popover" class="popover hidden"></div>
 <div id="toast" class="toast hidden"></div>
-<script src="/static/app.js?v=18"></script>
+<!-- Rückfrage vor dem Einfügen eines Beispiels. Esc und ein Klick neben den Dialog brechen ab. -->
+<dialog id="exampleDialog" class="dialog" aria-labelledby="exampleDialogTitle">
+  <div>
+    <h2 id="exampleDialogTitle">Beispiel einfügen?</h2>
+    <p><strong id="exampleTitle"></strong> <span id="exampleSize" class="muted"></span></p>
+    <pre id="examplePreview" class="preview"></pre>
+    <p id="exampleReplace" class="warn hidden"></p>
+    <p class="muted">Danach wird das Beispiel sofort geprüft.</p>
+    <form method="dialog" class="row actions">
+      <button value="cancel" class="ghost">Abbrechen</button>
+      <button value="ok" class="primary" autofocus>Einfügen und prüfen</button>
+    </form>
+  </div>
+</dialog>
+<script src="/static/app.js?v=19"></script>
 </body>
 </html>

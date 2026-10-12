@@ -436,15 +436,39 @@
   $("run").onclick = () => run(false);
   $("force").onclick = () => run(true);
   // „Von vorne beginnen“ in Schritt 3 macht dasselbe wie „Leeren“ und führt zurück zu Schritt 1.
-  $("clear").onclick = $("restart").onclick = () => { $("text").value = ""; $("example").value = ""; clearResult(); $("text").focus({ preventScroll: true }); };
+  // Nach einem Abbruch zeigt die Auswahl wieder das Beispiel, das zuletzt eingefügt wurde.
+  let lastExample = "";
+  $("clear").onclick = $("restart").onclick = () => { $("text").value = ""; $("example").value = lastExample = ""; clearResult(); $("text").focus({ preventScroll: true }); };
   STAGES.forEach((s, i) => { s.querySelector(".stagehead").onclick = () => { stageOpen[i] = !stageOpen[i]; renderSteps(); }; });
   $("threshold").oninput = (e) => { $("thresholdValue").textContent = Number(e.target.value).toFixed(2); };
   $("expertMode").onchange = (e) => setExpert(e.target.checked);
   $("infoToggle").onclick = (e) => { e.preventDefault(); $("info").classList.toggle("hidden"); };
+  // Ein Beispiel ersetzt den Text im Feld und startet sofort die Prüfung, deshalb fragt ein Dialog vorher nach.
+  // Er zeigt den Anfang des Beispiels und warnt, wenn schon Text im Feld steht.
+  function confirmExample(title, text) {
+    const d = $("exampleDialog"), lines = text.split("\n"), current = $("text").value;
+    $("exampleTitle").textContent = title;
+    $("exampleSize").textContent = `· ${num(text.length)} Zeichen`;
+    $("examplePreview").textContent = lines.slice(0, 8).join("\n") + (lines.length > 8 ? "\n…" : "");
+    $("exampleReplace").textContent = `Der Text im Eingabefeld (${num(current.length)} Zeichen) wird ersetzt.`;
+    $("exampleReplace").classList.toggle("hidden", !current.trim());
+    // Ausgewertet werden Knopf, Esc und Klick daneben direkt; das close-Event kommt in Hintergrund-Tabs verspätet.
+    return new Promise((resolve) => {
+      const done = (ok) => { d.querySelector("form").onsubmit = d.oncancel = d.onclick = null; d.close(); resolve(ok); };
+      d.querySelector("form").onsubmit = (e) => { e.preventDefault(); done(e.submitter?.value === "ok"); };
+      d.oncancel = (e) => { e.preventDefault(); done(false); };
+      d.onclick = (e) => { if (e.target === d) done(false); };
+      d.showModal();
+    });
+  }
   $("example").onchange = async (e) => {
     if (!e.target.value) return;
-    try { const ex = await api("/api/examples/" + encodeURIComponent(e.target.value)); $("text").value = ex.text; run(false); }
-    catch (err) { showError("Das Beispiel konnte nicht geladen werden: " + err.message); }
+    try {
+      const ex = await api("/api/examples/" + encodeURIComponent(e.target.value));
+      if (!(await confirmExample(e.target.selectedOptions[0].textContent, ex.text))) { e.target.value = lastExample; return; }
+      lastExample = e.target.value;
+      $("text").value = ex.text; run(false);
+    } catch (err) { showError("Das Beispiel konnte nicht geladen werden: " + err.message); }
   };
   // Eingefügter Text wird sofort geprüft; getippter Text erst auf Knopfdruck. Jede Änderung verwirft das alte Ergebnis.
   $("text").addEventListener("paste", () => { lastInputWasPaste = true; });

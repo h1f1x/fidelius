@@ -69,7 +69,8 @@ Zeile mit Zusammenfassung zusammen und lässt sich per Klick wieder aufklappen. 
 erreichte Schritte zeigen „wartet“.
 
 1. **Text einfügen.** Eingefügter Text wird sofort geprüft, getippter Text nach Klick auf
-   „Anonymisieren“ (auch Cmd/Ctrl+Enter). Unter dem Feld lässt sich ein Beispiel wählen. Die
+   „Anonymisieren“ (auch Cmd/Ctrl+Enter). Unter dem Feld lässt sich ein Beispiel wählen; ein Dialog zeigt
+   seinen Anfang und fragt, bevor es den Text im Feld ersetzt. Die
    Einschätzung zeigt ein rot-grüner Balken mit Wortstufe („sehr unwahrscheinlich“ bis „sehr
    sicher“). Ab „wahrscheinlich“ wird direkt anonymisiert, und Schritt 2 öffnet sich. Sonst bleibt
    Schritt 1 offen und bietet „Trotzdem anonymisieren“ an.
