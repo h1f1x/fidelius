@@ -17,7 +17,10 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.6", "httpx2>=2.13"]
+# httpx2 (pydantic/httpx2) ist kein Typosquat von httpx, Starlette 1.7 verlangt es für den TestClient.
+# Gepinnt auf 2.10.0, die letzte Version mit PyPI-Provenance: Seit 2.11.0 veröffentlicht httpx2
+# per `uv publish` ohne Attestations. Pin erst lösen, wenn neue Versionen wieder Provenance tragen.
+dev = ["pytest>=8", "ruff>=0.6", "httpx2==2.10.0"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
