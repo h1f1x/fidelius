@@ -105,6 +105,23 @@ button.restart { margin-left: auto; }
 .dialog .preview { margin: 8px 0; padding: 8px 10px; max-height: 160px; overflow: auto; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; }
 .dialog .warn { color: var(--danger); }
 .dialog .actions { justify-content: flex-end; gap: 8px; margin-top: 12px; }
+/* Splash beim ersten Aufruf: drei Kacheln für die Schritte, darunter Hinweise. */
+.dialog.splash { width: min(680px, calc(100vw - 32px)); }
+.splash code { background: var(--bg); padding: 0 4px; border-radius: 3px; }
+.splash .tiles { list-style: none; margin: 14px 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; counter-reset: tile; }
+.splash .tiles li { counter-increment: tile; position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px 10px 12px; text-align: center; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; font-size: 13px; }
+.splash .tiles li::before { content: counter(tile); position: absolute; top: 6px; left: 8px; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; background: var(--primary); color: var(--primary-text); font-size: 11px; font-weight: 700; }
+.splash .tiles .icon { font-size: 28px; line-height: 1.2; }
+.splash .tiles span:last-child { color: var(--muted); font-size: 12px; }
+@media (max-width: 560px) { .splash .tiles { grid-template-columns: 1fr; } }
+.splash .caution, .splash .notice { margin: 10px 0; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border); border-left: 4px solid var(--c5); }
+.splash .caution ul, .splash .notice ul { margin: 6px 0 0; padding-left: 20px; }
+.splash .caution li { margin: 3px 0; }
+.splash .notice { border-left-color: var(--primary); }
+.splash .notice h3, .splash .notice h4 { margin: 4px 0; font-size: 14px; color: var(--text); }
+.splash .notice a { color: var(--primary); }
+.splash .actions { justify-content: space-between; }
+footer a { color: inherit; }
 .toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 8px 14px; border-radius: 6px; font-size: 13px; z-index: 20; }
 .hidden { display: none !important; }
 

@@ -28,6 +28,7 @@ init: _tools-$(OS) _runtime-$(OS) _compose _memory ## Tools prüfen und fehlende
 	@echo "Fertig. Weiter mit: make up"
 
 up: _start-$(OS) ## Container bauen und starten, wartet bis alles bereit ist
+	@mkdir -p local
 	env $$(scripts/build-info.sh) docker compose up --build -d --wait --wait-timeout $(WAIT_TIMEOUT)
 	@echo "Web-UI: http://localhost:$(APP_PORT)"
 

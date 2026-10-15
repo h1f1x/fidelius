@@ -23,6 +23,10 @@ elif ! grep -q '^APP_BIND=' .env; then
 fi
 echo "App bindet an $(sed -n 's/^APP_BIND=//p' .env)"
 
+# Ohne das Verzeichnis legte Docker es für den Mount als root an, und Hinweise ließen sich nur
+# noch mit sudo ablegen.
+mkdir -p local
+
 # Der erste Start lädt den Laya-Checkpoint, das kann dauern.
 docker compose up --build -d --wait --wait-timeout "$wait_timeout"
 docker compose ps

@@ -79,7 +79,16 @@ def get_config() -> dict:
         "max_text_chars": config.MAX_TEXT_CHARS,
         "calibration": calibration.as_dict(),
         "build": build_info.build(),
+        "notice": _notice(),
     }
+
+
+def _notice() -> str | None:
+    try:
+        text = Path(config.NOTICE_FILE).read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    return text or None
 
 
 @app.get("/api/examples")

@@ -58,6 +58,28 @@ App weiter (siehe [docs/protokollierung.md](docs/protokollierung.md)). Die App s
 hat keinen Login. Auf eine VM mit ssh-Zugang deployt
 `make deploy DEPLOY_HOST=user@vm`, siehe [docs/deployen.md](docs/deployen.md).
 
+## Hinweise für diese Installation
+
+Beim ersten Aufruf zeigt die App einen kurzen Splash-Screen: was sie macht, die drei Schritte und
+was zu beachten ist. Er erscheint wieder, sobald sich sein Inhalt ändert, und lässt sich über
+„Hinweise“ in der Fußzeile jederzeit öffnen.
+
+Hinweise, die nur für eine Installation gelten, etwa zu einer Betriebsvereinbarung, gehören nicht
+ins Repo, sondern nach `local/hinweise.md` (in `.gitignore`). Der Splash zeigt sie als eigenen
+Abschnitt. Die Datei ist Markdown mit Überschriften, Absätzen, Listen, **fett**, *kursiv* und Links
+(`http`, `https`, `mailto`); HTML wird als Text angezeigt. Die App liest sie bei jedem Aufruf neu,
+ein Neustart ist nicht nötig.
+
+```markdown
+## Betriebliche Nutzung
+
+Zur betrieblichen Nutzung bei **Schraubenhuber & Co. KG** beachtet bitte auch die
+[Betriebsvereinbarung](https://intranet.example/betriebsvereinbarung).
+```
+
+`make deploy` überträgt `local/` nicht und löscht es auf der VM auch nicht. Dort legt man die Datei
+einmal selbst ab, z. B. nach `make remote-login`.
+
 ## Bedienung
 
 Die Oberfläche ist für Nutzer ohne technisches Vorwissen gedacht. Ein Klick auf „Wie funktioniert
@@ -162,6 +184,7 @@ App protokolliert, gelten dort als wesentliche Änderung und gehen vorher an den
 | `GLINER_THRESHOLD` | 0.5 | Mindest-Score für GLiNER2-PII-Treffer |
 | `OMP_NUM_THREADS` | 4 | CPU-Threads je Container |
 | `MAX_TEXT_CHARS` | 50000 | Höchstlänge eines Textes je Anfrage, längere lehnt die App ab |
+| `NOTICE_FILE` | /opt/local/hinweise.md | Pfad im Container für die Hinweise dieser Installation im Splash-Screen; `./local` ist dorthin gemountet |
 | `REQUEST_LOG` | /var/log/fidelius/requests.jsonl | Pfad im Container für das Request-Log (eine JSON-Zeile je Prüfung, ohne Text); nur unter `/var/log/fidelius` liegt es auf dem Volume `request-log` |
 
 Kategorien, Farben, Label-Zuordnungen und die Laya-Fragen stehen in `app/fidelius/config.py`.

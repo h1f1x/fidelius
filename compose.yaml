@@ -58,6 +58,8 @@ services:
       - "${APP_BIND:-127.0.0.1}:${APP_PORT:-8080}:8080"
     volumes:
       - ./examples:/opt/examples:ro
+      # Hinweise dieser Installation für den Splash-Screen (local/hinweise.md), nicht im Repo.
+      - ./local:/opt/local:ro
       # Request-Log; überdauert Deploys, make down (ohne -v) lässt es stehen.
       - request-log:/var/log/fidelius
     logging: *logging

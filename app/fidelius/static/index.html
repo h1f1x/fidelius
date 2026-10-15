@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sensible Inhalte für ChatGPT ersetzen</title>
-<link rel="stylesheet" href="/static/style.css?v=20">
+<link rel="stylesheet" href="/static/style.css?v=21">
 </head>
 <body>
 <header>
@@ -91,10 +91,36 @@
   </div>
 </main>
 
-<footer><span id="version"></span><span class="expert-only"> · <a href="https://github.com/h1f1x/fidelius" target="_blank" rel="noopener">Quellcode auf GitHub</a></span></footer>
+<footer><span id="version"></span> · <a href="#" id="splashOpen">Hinweise</a><span class="expert-only"> · <a href="https://github.com/h1f1x/fidelius" target="_blank" rel="noopener">Quellcode auf GitHub</a></span></footer>
 
 <div id="popover" class="popover hidden"></div>
 <div id="toast" class="toast hidden"></div>
+<!-- Splash beim ersten Aufruf: kurz und bildhaft, Einzelheiten stehen unter „Wie funktioniert das?“.
+     Schließt nur über den Knopf, damit Pflichthinweise einer Installation nicht versehentlich wegklicken. -->
+<dialog id="splash" class="dialog splash" aria-labelledby="splashTitle">
+  <div>
+    <h2 id="splashTitle">Sensible Inhalte ersetzen, bevor sie in die KI gehen</h2>
+    <p class="muted">Namen, Adressen, Nummern und Bankdaten werden durch Platzhalter wie <code>[PERSON_1]</code> ersetzt. Die Antwort der KI bekommt die echten Angaben zurück.</p>
+    <ol class="tiles">
+      <li><span class="icon" aria-hidden="true">📋</span><b>Text einfügen</b><span>wird geprüft und anonymisiert</span></li>
+      <li><span class="icon" aria-hidden="true">🔍</span><b>Prüfen und kopieren</b><span>in ChatGPT oder eine andere KI</span></li>
+      <li><span class="icon" aria-hidden="true">↩️</span><b>Antwort zurückübersetzen</b><span>Platzhalter werden wieder zu Namen</span></li>
+    </ol>
+    <div class="caution">
+      <strong>Bitte beachten</strong>
+      <ul>
+        <li>Die Erkennung ist nicht fehlerfrei. Lies den anonymisierten Text, bevor du ihn kopierst.</li>
+        <li>Der Text verlässt diesen Server nicht. Welcher Platzhalter wofür steht, liegt nur in deinem Browser.</li>
+        <li>Brauchst du die Zuordnung später noch, exportiere sie vor „Von vorne beginnen“.</li>
+      </ul>
+    </div>
+    <section id="notice" class="notice hidden" aria-label="Hinweise für diese Installation"></section>
+    <form method="dialog" class="row actions">
+      <a href="#" id="splashMore" class="infolink">Mehr unter „Wie funktioniert das?“</a>
+      <button value="ok" class="primary" autofocus>Verstanden</button>
+    </form>
+  </div>
+</dialog>
 <!-- Rückfrage vor dem Einfügen eines Beispiels. Esc und ein Klick neben den Dialog brechen ab. -->
 <dialog id="exampleDialog" class="dialog" aria-labelledby="exampleDialogTitle">
   <div>
@@ -109,6 +135,6 @@
     </form>
   </div>
 </dialog>
-<script src="/static/app.js?v=19"></script>
+<script src="/static/app.js?v=20"></script>
 </body>
 </html>

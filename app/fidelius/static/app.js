@@ -5,6 +5,7 @@
   const SOURCE_BADGE = { gliner: "G", spacy: "S", regex: "R" };
   const STORAGE_KEY = "fidelius-state-v2";
   const EXPERT_KEY = "fidelius-expert";
+  const SPLASH_KEY = "fidelius-splash";
 
   let CONFIG = { categories: {} };
   const emptyState = () => ({ text: "", entities: [], mapping: [], anonymized: "", gate: null, timing: null, elapsed_ms: null, copied: false });
@@ -66,6 +67,7 @@
     }
     renderVersion(CONFIG.build);
     renderLimit();
+    initSplash(CONFIG.notice);
     $("threshold").value = CONFIG.gate_threshold; $("thresholdValue").textContent = Number(CONFIG.gate_threshold).toFixed(2);
     try {
       const ex = await api("/api/examples");
@@ -93,6 +95,57 @@
   function renderLimit() {
     for (const el of document.querySelectorAll(".maxpages")) el.textContent = pages(CONFIG.max_text_chars);
     $("pageChars").textContent = num(PAGE_CHARS);
+  }
+  // ---------- Splash ----------
+  // Der Splash erscheint, bis er mit dem aktuellen Inhalt bestätigt wurde. Gemerkt wird ein Hash über
+  // den festen Text und die Hinweise der Installation; ändert sich eins davon, erscheint er erneut.
+  let splashHash = "";
+  function initSplash(notice) {
+    const fixed = $("splash").textContent;
+    $("notice").innerHTML = notice ? markdown(notice) : "";
+    $("notice").classList.toggle("hidden", !notice);
+    splashHash = hash(fixed + "\n" + (notice || ""));
+    let seen = null;
+    try { seen = localStorage.getItem(SPLASH_KEY); } catch {}
+    if (seen !== splashHash) openSplash();
+  }
+  function openSplash() { if (!$("splash").open) $("splash").showModal(); }
+  function closeSplash() { $("splash").close(); try { localStorage.setItem(SPLASH_KEY, splashHash); } catch {} }
+  // FNV-1a, 32 Bit. crypto.subtle gibt es ohne HTTPS nicht, und hier geht es nur ums Wiedererkennen.
+  function hash(str) {
+    let h = 0x811c9dc5;
+    for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193); }
+    return (h >>> 0).toString(16);
+  }
+  // Kleines Markdown für die Hinweise einer Installation: Überschriften, Absätze, Listen, fett, kursiv
+  // und Links. Alles wird zuerst escaped; Links nur mit http, https oder mailto.
+  function markdown(src) {
+    const inline = (t) => esc(t)
+      .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (m, text, url) => /^(https?:|mailto:)/i.test(url) ? `<a href="${url}" target="_blank" rel="noopener">${text}</a>` : text)
+      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+      .replace(/(^|[^*])\*([^*\s][^*]*?)\*/g, "$1<em>$2</em>");
+    const out = [];
+    let para = [], list = null;
+    const flush = () => {
+      if (para.length) out.push(`<p>${inline(para.join(" "))}</p>`);
+      if (list) out.push(`<${list.tag}>${list.items.map((i) => `<li>${inline(i)}</li>`).join("")}</${list.tag}>`);
+      para = []; list = null;
+    };
+    for (const line of src.split(/\r?\n/)) {
+      const t = line.trim(), h = t.match(/^(#{1,6})\s+(.*)$/), ul = t.match(/^[-*]\s+(.*)$/), ol = t.match(/^\d+[.)]\s+(.*)$/);
+      if (!t) flush();
+      else if (h) { flush(); const tag = h[1].length <= 2 ? "h3" : "h4"; out.push(`<${tag}>${inline(h[2])}</${tag}>`); }
+      else if (ul || ol) {
+        const tag = ul ? "ul" : "ol";
+        if (para.length || (list && list.tag !== tag)) flush();
+        list ??= { tag, items: [] };
+        list.items.push((ul || ol)[1]);
+      }
+      else if (list) list.items[list.items.length - 1] += " " + t;
+      else para.push(t);
+    }
+    flush();
+    return out.join("");
   }
   // Woher die Laufzeitschätzung kommt: gemessen beim Start dieses Dienstes, auf dieser Maschine.
   function calibrationText(c) {
@@ -443,6 +496,11 @@
   $("threshold").oninput = (e) => { $("thresholdValue").textContent = Number(e.target.value).toFixed(2); };
   $("expertMode").onchange = (e) => setExpert(e.target.checked);
   $("infoToggle").onclick = (e) => { e.preventDefault(); $("info").classList.toggle("hidden"); };
+  // Der Splash schließt nur über seine Knöpfe; Esc und ein Klick daneben zählen nicht als gelesen.
+  $("splash").querySelector("form").onsubmit = (e) => { e.preventDefault(); closeSplash(); };
+  $("splash").oncancel = (e) => e.preventDefault();
+  $("splashMore").onclick = (e) => { e.preventDefault(); closeSplash(); $("info").classList.remove("hidden"); $("info").scrollIntoView({ block: "nearest" }); };
+  $("splashOpen").onclick = (e) => { e.preventDefault(); openSplash(); };
   // Ein Beispiel ersetzt den Text im Feld und startet sofort die Prüfung, deshalb fragt ein Dialog vorher nach.
   // Er zeigt den Anfang des Beispiels und warnt, wenn schon Text im Feld steht.
   function confirmExample(title, text) {

@@ -102,6 +102,10 @@ DATE_STOPWORDS = {
 
 EXAMPLES_DIR = os.environ.get("EXAMPLES_DIR", "/opt/examples")
 
+# Hinweise einer Installation für den Splash-Screen, etwa auf eine Betriebsvereinbarung. Markdown,
+# liegt außerhalb des Repos in local/ und wird bei jedem Aufruf gelesen; fehlt die Datei, gibt es keine.
+NOTICE_FILE = os.environ.get("NOTICE_FILE", "/opt/local/hinweise.md")
+
 # Eine JSON-Zeile je Prüfung für die spätere Auswertung (Textlängen, Gate-Quote, Dauern).
 # Liegt auf einem Volume, weil docker logs einen Deploy nicht überdauert.
 REQUEST_LOG = os.environ.get("REQUEST_LOG", "/var/log/fidelius/requests.jsonl")

@@ -51,6 +51,13 @@ für alles außer dem Proxy sperrt.
 Unabhängig davon lehnt die App zu große Anfragen ab: Texte über `MAX_TEXT_CHARS` Zeichen,
 Request-Bodys über 2 MB und mehr als 2000 Stellen auf einmal.
 
+## Hinweise für diese Installation
+
+Hinweise, die der Splash-Screen nur in dieser Installation zeigen soll, etwa zur
+Betriebsvereinbarung, liegen auf der VM in `local/hinweise.md` im Deploy-Verzeichnis (Format siehe
+README). rsync überträgt `local/` nicht und löscht es auch nicht, die Datei überdauert also jeden
+Deploy. Ändert man sie, sehen alle den Splash beim nächsten Aufruf noch einmal.
+
 ## Auf der VM nachsehen
 
 `make remote-login` öffnet eine Shell auf der VM im Deploy-Verzeichnis, mit denselben Variablen
