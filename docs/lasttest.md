@@ -1,9 +1,8 @@
 # Lasttest: Ergebnis
 
-Messreihe vom 07. und 08.10.2026 auf der Dev-VM, Build #21 (`0f629bd`). Methode und Bewertung
+Messreihe vom 07. und 08.10.2026 auf der Dev-VM, Build #21 (`51b984e`). Methode und Bewertung
 stehen in der [Spec](specs/lasttest.md), alle Grafiken im [Bericht](lasttest-bericht.html)
-(eine HTML-Datei, öffnet offline). Issues: [#22](https://github.com/h1f1x/fidelius/issues/22),
-[#26](https://github.com/h1f1x/fidelius/issues/26).
+(eine HTML-Datei, öffnet offline).
 
 ## Sweet Spot
 

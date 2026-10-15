@@ -57,7 +57,7 @@ einzelnen Seitenaufrufe mit Netzadressen schreibt sie nicht. Die Meldungen sind 
 begrenzt; ältere werden überschrieben.
 
 **Löschfrist.** Geplant ist, das Nutzungsprotokoll nach 14 Tagen zu löschen
-([#28](https://github.com/h1f1x/fidelius/issues/28)). Bis das umgesetzt ist, wird es nicht
+([#6](https://github.com/h1f1x/fidelius/issues/6)). Bis das umgesetzt ist, wird es nicht
 automatisch gelöscht.
 
 ## 3. Warum sich nichts einer Person zuordnen lässt
@@ -94,7 +94,7 @@ automatisch gelöscht.
 - Zugriff auf den Server haben nur namentlich benannte Administratoren.
 - Kommt später eine Anmeldung dazu, prüft sie nur, ob jemand zur Organisation gehört. Wer es ist,
   erfährt fidelius nicht, und die Anmeldung protokolliert es nicht
-  ([#19](https://github.com/h1f1x/fidelius/issues/19)).
+  ([#4](https://github.com/h1f1x/fidelius/issues/4)).
 
 ## 6. Welche anderen Systeme beteiligt sind
 
@@ -112,11 +112,11 @@ nicht mit denen von fidelius zusammenführen.
 ## Offene Punkte
 
 - Die Löschfrist von 14 Tagen für das Nutzungsprotokoll ist noch nicht umgesetzt
-  ([#28](https://github.com/h1f1x/fidelius/issues/28)).
+  ([#6](https://github.com/h1f1x/fidelius/issues/6)).
 - Was ein Anmeldedienst bei einer späteren Anmeldung über die Person protokolliert, steht erst fest,
-  wenn klar ist, welcher es wird ([#19](https://github.com/h1f1x/fidelius/issues/19)).
+  wenn klar ist, welcher es wird ([#4](https://github.com/h1f1x/fidelius/issues/4)).
 - Die Übersichtsseite und das Nutzungsprotokoll sind heute für alle erreichbar, die fidelius
-  erreichen. Ob das so bleibt, wird in [#19](https://github.com/h1f1x/fidelius/issues/19)
+  erreichen. Ob das so bleibt, wird in [#4](https://github.com/h1f1x/fidelius/issues/4)
   entschieden.
 - Die rechtliche Bewertung durch Datenschutz und Betriebsrat steht aus.
 

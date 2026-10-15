@@ -1,10 +1,10 @@
 # Spec: Auswertung des Request-Logs
 
-Stand: 2026-10-06, Ergebnis einer Klärungsrunde und eines UI-Prototyps. Alle Punkte sind entschieden und umgesetzt, nachgezogen nach dem Review von PR #15. Issue: [#12](https://github.com/h1f1x/fidelius/issues/12).
+Stand: 2026-10-06, Ergebnis einer Klärungsrunde und eines UI-Prototyps. Alle Punkte sind entschieden und umgesetzt, nachgezogen nach dem Review.
 
 ## Ausgangslage
 
-- Seit #10 schreibt fidelius je Prüfung eine JSON-Zeile nach `REQUEST_LOG` (Felder siehe `docs/specs/laufzeit-und-request-log.md`, Abschnitt 4). Die Datei liegt auf dem Volume `request-log`, im Betrieb also auf der VM.
+- fidelius schreibt je Prüfung eine JSON-Zeile nach `REQUEST_LOG` (Felder siehe `docs/specs/laufzeit-und-request-log.md`, Abschnitt 4). Die Datei liegt auf dem Volume `request-log`, im Betrieb also auf der VM.
 - Das Log enthält nur Zahlen und Schalter, keinen Text und keine Treffer. Eine Auswertung zeigt deshalb nichts Sensibles.
 - Bisher lässt sich das Log nur von Hand lesen, per `docker compose exec` auf der VM.
 - Das Log wird nicht rotiert. 10.000 Anfragen ergeben ~3 MB, deshalb darf es bei jedem Aufruf ganz gelesen werden.

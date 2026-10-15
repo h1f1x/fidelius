@@ -1,6 +1,6 @@
 # Spec: Lasttest und VM-Größe
 
-Stand: 2026-10-08. Umgesetzt mit #27, gemessen mit #26, Ergebnis in [docs/lasttest.md](../lasttest.md). Issue: [#22](https://github.com/h1f1x/fidelius/issues/22).
+Stand: 2026-10-08. Ergebnis in [docs/lasttest.md](../lasttest.md).
 
 ## Ziel
 
@@ -22,12 +22,12 @@ Stand: 2026-10-08. Umgesetzt mit #27, gemessen mit #26, Ergebnis in [docs/lastte
 - **Fehlerverhalten:** Bei einem 503 oder Timeout von Laya antwortet die App trotzdem mit 200, dann aber ohne Gate oder ohne Bestätigung. Der Hinweis steht in `gate.note` und im Log-Feld `fehler`.
 - **Kalibrierung:** Nach jedem Start misst die App rund 45 s lang. Danach liefert `/api/config` Sockel und Rate, eine Einzelbetriebs-Messung der laufenden Maschine.
 - **Request-Log:** `quelle` ist immer `anfrage`, außer bei der Kalibrierung. Lasttest-Anfragen sind heute nicht unterscheidbar. `log_report.py` filtert nur `kalibrierung` heraus.
-- **Dev-VM:** die einzige VM, hinter Caddy mit TLS, ohne Auth (#19).
+- **Dev-VM:** die einzige VM, hinter Caddy mit TLS, ohne Auth (#4).
   - 8 vCPU (AMD EPYC 9454, KVM), 7,76 GiB RAM.
   - Im Leerlauf belegt die App 4,0 GiB und Laya 1,8 GiB, rund 2 GiB sind frei.
   - In der `.env` steht nur `APP_BIND`, `OMP_NUM_THREADS` ist also 4.
   - Ein Überwachungs-Agent läuft mit.
-- **Speicher bei langen Texten:** Laut #9 dauerte ein Text mit 50.000 Zeichen und `force` 206 s. Die Spitzen lagen bei 3,2 GB (App) und 3,6 GB (Laya).
+- **Speicher bei langen Texten:** Gemessen dauerte ein Text mit 50.000 Zeichen und `force` 206 s. Die Spitzen lagen bei 3,2 GB (App) und 3,6 GB (Laya).
 
 ## Hypothese
 
@@ -124,7 +124,7 @@ Der Test soll das bestätigen oder widerlegen.
 - **Nach jeder Stufe und nach dem Lauf:** `docker inspect` noch einmal lesen. Ein höherer `RestartCount`, ein neues `OOMKilled`, ein anderes `StartedAt` oder eine andere Container-ID zählen als Bruch der Stufe.
 - **Auf der VM nur lesen:** Konfiguration und Neustart bleiben bei Felix (`make remote-login`, `make deploy`). Ein Lasttest ändert die Instanz nie unbemerkt.
 - **Anfragen:** tragen den Header `X-Fidelius-Quelle: lasttest`.
-- **Keine Auth:** Das Skript unterstützt keine Anmeldung. Kommt mit #19 Auth vor den Proxy, wird sie ergänzt.
+- **Keine Auth:** Das Skript unterstützt keine Anmeldung. Kommt mit #4 Auth vor den Proxy, wird sie ergänzt.
 - **Ablage:** `loadtest-results/<YYYY-MM-DD-HHMM>-<vcpu>cpu-<threads>t[-<label>]/`, ohne VM `…-ohne-vm[-<label>]/`. Gibt es den Namen schon, hängt das Skript `-2`, `-3` … an. Das Verzeichnis `loadtest-results/` steht in `.gitignore`.
   - `requests.jsonl`, eine Zeile je Anfrage: Stufe, Nutzer, Beispiel, Zeichen, Startzeit, Client-ms, HTTP-Status, Klasse, `timing`, `gate.note`, Fehlertext
   - `samples.jsonl`: die Messwerte des Samplers
@@ -179,7 +179,7 @@ Der Test soll das bestätigen oder widerlegen.
 
 ## Umsetzung in Tickets
 
-Als Sub-Issues von #22:
+Als Sub-Issues:
 
 1. **Kennzeichnung im Request-Log** (Abschnitt 4), `ready-for-agent`.
 2. **Lastskript mit Auswertungslogik und Tests** (Abschnitte 1, 2, 5, 7), `ready-for-agent`, blockiert durch 1. Ohne Kennzeichnung würde schon der erste Lauf auf der Dev-VM die Auswertung verfälschen.
