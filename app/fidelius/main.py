@@ -94,6 +94,7 @@ def _classification_config() -> dict | None:
     return {
         "levels": [{"id": lv.id, "name": lv.name, "text": lv.text} for lv in rules.levels],
         "freigegeben_bis": rules.approved_up_to,
+        "schwelle": rules.threshold,
         "zugangsdaten_text": rules.credentials_text,
     }
 
@@ -178,7 +179,8 @@ def classify(req: ClassifyRequest) -> TextLevel:
 def get_report(period: str = "30d") -> dict:
     """Fehlt das Log, kommt trotzdem eine Antwort mit log.present = false und dem Pfad."""
     try:
-        return log_report.report(config.REQUEST_LOG, period)
+        rules, _ = classification.active_rules()  # Reihenfolge und Namen der Stufen
+        return log_report.report(config.REQUEST_LOG, period, rules=rules)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
 

@@ -135,7 +135,7 @@ Alles in diesem Abschnitt gilt nur bei Flag an und gültiger Regeldatei.
   `anonymized` ist `null`, wenn der Text unverändert blieb. Die Abschnitte von `anonymized` beziehen sich auf den anonymisierten Text.
 - **`POST /api/classify`** mit `{"text": "…"}` liefert ein einzelnes Objekt wie `original` oben. Die UI ruft es für „neu bewerten“ mit dem aktuellen anonymisierten Text auf. Es gelten dieselben Grenzen wie bei `/api/analyze` (Textlänge, Body).
 - **`/api/apply`** bleibt ohne Modellaufruf.
-- **`/api/config`** liefert `classification` mit `levels` (`id`, `name`, `text`), `freigegeben_bis` und `zugangsdaten_text`, ohne die `laya`-Kurzfassungen. Bei Flag aus, fehlender oder ungültiger Datei: `null`.
+- **`/api/config`** liefert `classification` mit `levels` (`id`, `name`, `text`), `freigegeben_bis`, `schwelle` (für die Expertenansicht) und `zugangsdaten_text`, ohne die `laya`-Kurzfassungen. Bei Flag aus, fehlender oder ungültiger Datei: `null`.
 - **`/api/classify`** antwortet bei Flag aus oder ohne gültige Regeldatei mit 404.
 - **`/api/health`** liefert `classification`: `"aus"` (Flag aus), `"aktiv: 4 Stufen"` oder `"Fehler: <Meldung mit Zeile>"` (Flag an, Datei fehlt oder ist ungültig).
 
