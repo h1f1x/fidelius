@@ -16,9 +16,9 @@ from .detectors.credentials import detect_credentials
 from .detectors.gliner import detect_gliner
 from .detectors.regex_det import detect_regex
 from .detectors.spacy_det import detect_spacy
-from .laya_client import LayaClient
+from .laya_client import GateResult, LayaClient
 from .merge import merge_hits
-from .models import AnalyzeRequest, AnalyzeResponse, Entity, Gate, Timing
+from .models import AnalyzeRequest, AnalyzeResponse, Classification, Entity, Gate, Timing
 from .placeholders import anonymize, assign_placeholders, build_mapping
 from .request_log import RequestLog
 
@@ -52,15 +52,20 @@ class Pipeline:
         allowed = set(req.categories) if req.categories else set(classification.categories(rules))
         threshold = req.gate_threshold if req.gate_threshold is not None else config.GATE_THRESHOLD
 
-        # 1. Gate
+        # 1. Gate, bei aktiver Klassifikation mit deren Fragen im selben Batch
         gate_note = None
         prob: float | None = None
+        result, laya_error = None, None
         try:
-            prob = self.laya.gate(text).probability
+            result = (self.laya.gate(text, extra=classification.questions(rules)) if rules
+                      else self.laya.gate(text))
+            prob = result.probability
         except Exception as exc:  # Laya nicht erreichbar: Erkennung trotzdem erlauben
             log.warning("Laya-Gate fehlgeschlagen: %s", exc)
+            laya_error = exc.__class__.__name__
             gate_note = f"Laya nicht erreichbar ({exc.__class__.__name__}); Gate übersprungen."
         timing.gate_ms = self._ms(t0)
+        classified = _classify_original(rules, result, laya_error) if rules else None
         sensitive = prob is None or prob >= threshold
         gate = Gate(probability=prob, threshold=threshold, sensitive=sensitive,
                     skipped=req.force, note=gate_note)
@@ -103,7 +108,7 @@ class Pipeline:
         res = AnalyzeResponse(
             text=text, gate=gate, entities=entities,
             anonymized_text=anonymize(text, entities),
-            mapping=build_mapping(entities), timing=timing,
+            mapping=build_mapping(entities), timing=timing, classification=classified,
         )
         if self.request_log:
             self.request_log.write(_log_entry(req, res, source, laya_rejected))
@@ -122,6 +127,15 @@ def _as_credential(h: RawHit) -> RawHit:
     if h.source == "gliner" and h.label in config.ZUGANG_GLINER_LABELS:
         return replace(h, category=config.ZUGANG)
     return h
+
+
+def _classify_original(rules: classification.Rules, result: GateResult | None,
+                       laya_error: str | None) -> Classification:
+    """Stufe des Originals aus dem Gate-Batch; ohne Laya-Antwort nur ein Hinweis."""
+    if result is None:
+        return classification.summarize(
+            rules, None, note=f"Laya nicht erreichbar ({laya_error}); keine Schutzstufe.")
+    return classification.summarize(rules, classification.assess(rules, result.sections))
 
 
 def _log_entry(req: AnalyzeRequest, res: AnalyzeResponse, source: Source,

@@ -1,12 +1,19 @@
-"""Klassifikation nach Schutzstufen: Regeldatei der Installation lesen und prüfen."""
+"""Klassifikation nach Schutzstufen: Regeldatei der Installation lesen und prüfen, Laya-Antworten
+zu einer Stufe je Abschnitt und je Text verdichten."""
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import yaml
 
 from . import config
+from .models import ChunkLevel, Classification, Span, TextLevel
+
+if TYPE_CHECKING:
+    from .laya_client import Section
 
 # Startwert, bis die Kalibrierbeispiele einen besseren liefern (docs/specs/klassifikation.md).
 DEFAULT_THRESHOLD = 0.3
@@ -101,3 +108,51 @@ def categories(rules: Rules | None) -> dict[str, dict[str, str]]:
     if rules is None:
         return config.CATEGORIES
     return {**config.CATEGORIES, config.ZUGANG: config.ZUGANG_CATEGORY}
+
+
+# ---- Laya-Fragen und Auswertung ---------------------------------------------------------
+
+LEVEL_QUESTION = "stufe"
+LEVEL_INSTRUCTIONS = "Welcher Schutzstufe gehört dieser Text an?"
+
+
+def questions(rules: Rules) -> dict[str, dict]:
+    """Die Laya-Fragen der Klassifikation im Format des Batch-Endpunkts.
+
+    Sie laufen für das Original als `extra` im Gate-Batch mit. Die Kriterien sind die
+    `laya`-Kurzfassungen unter der Stufen-id, so kommen die Wahrscheinlichkeiten je id zurück.
+    """
+    return {LEVEL_QUESTION: {
+        "type": "choice",
+        "instructions": LEVEL_INSTRUCTIONS,
+        "criteria": {lv.id: lv.laya for lv in rules.levels},
+    }}
+
+
+def assess(rules: Rules, sections: Sequence[Section]) -> TextLevel:
+    """Stufe des Texts aus den Laya-Antworten je Abschnitt.
+
+    Je Abschnitt gilt die höchste Stufe mit einer Wahrscheinlichkeit ab `rules.threshold`,
+    sonst die wahrscheinlichste. Für den Text gilt die höchste Stufe über alle Abschnitte;
+    `chunk` ist der Abschnitt, der sie am deutlichsten trägt.
+    """
+    chunks = [_chunk_level(rules, s) for s in sections]
+    top = max(chunks, key=lambda c: (rules.rank(c.level), c.probabilities.get(c.level, 0.0)))
+    return TextLevel(level=top.level, chunk=Span(start=top.start, end=top.end), chunks=chunks)
+
+
+def _chunk_level(rules: Rules, section: Section) -> ChunkLevel:
+    raw = section.answers[LEVEL_QUESTION]["probabilities"]
+    probs = {lv.id: float(raw.get(lv.id, 0.0)) for lv in rules.levels}
+    above = [lv.id for lv in rules.levels if probs[lv.id] >= rules.threshold]
+    level = above[-1] if above else max(probs, key=probs.get)
+    return ChunkLevel(start=section.start, end=section.end, level=level, probabilities=probs)
+
+
+def summarize(rules: Rules, original: TextLevel | None, anonymized: TextLevel | None = None,
+              credentials: bool = False, note: str | None = None) -> Classification:
+    """Gesamtbild für die Antwort: gewarnt wird über der Freigabe oder bei Zugangsdaten."""
+    levels = [t.level for t in (original, anonymized) if t is not None]
+    warn = credentials or any(rules.above_approval(lv) for lv in levels)
+    return Classification(original=original, anonymized=anonymized, credentials=credentials,
+                          warn=warn, note=note)

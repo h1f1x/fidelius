@@ -120,6 +120,15 @@ zugangsdaten:             # optional
 - `text` ist Markdown für die Anzeige, etwa Definition und Regel für die KI-Nutzung.
 - `zugangsdaten.text` erscheint bei einer Warnung wegen Zugangsdaten; fehlt er, steht dort ein
   generischer Satz.
+- `schwelle` bestimmt die Stufe eines Abschnitts von 600 Zeichen: die höchste Stufe mit mindestens
+  dieser Wahrscheinlichkeit, sonst die wahrscheinlichste. Der Text bekommt die höchste Stufe über
+  alle Abschnitte. Die Fragen dafür laufen im selben Laya-Batch wie das Gate, auch wenn das Gate
+  den Text als harmlos einstuft.
+
+Nach der Analyse zeigt die UI die Stufe als Badge über dem Ergebnis, bis `freigegeben_bis` neutral,
+darüber in Warnfarbe und mit einem Banner, das den `text` der Stufe zeigt. `/api/analyze` liefert
+dazu das Feld `classification` (Format in der Spec, Abschnitt 6); ist Laya nicht erreichbar, steht
+dort nur ein Hinweis in `note`.
 
 Die App liest die Datei bei jedem Aufruf neu, eine Änderung wirkt ohne Neustart. Das Flag dagegen
 wirkt erst nach einem Neustart des Containers. `/api/health` zeigt im Feld `classification`, woran

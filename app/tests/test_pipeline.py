@@ -3,7 +3,7 @@ import json
 from concurrent.futures import ThreadPoolExecutor
 
 from fidelius.detectors.base import RawHit
-from fidelius.laya_client import GateResult
+from fidelius.laya_client import GateResult, Section
 from fidelius.models import AnalyzeRequest, Entity
 from fidelius.pipeline import Pipeline
 
@@ -16,10 +16,16 @@ class FakeLaya:
         self.reachable = reachable
         self.classified = False
 
-    def gate(self, text: str) -> GateResult:
+    def gate(self, text: str, extra: dict[str, dict] | None = None) -> GateResult:
         if not self.reachable:
             raise ConnectionError("Laya ist weg")
-        return GateResult(probability=self.gate_probability)
+        if not extra:
+            return GateResult(probability=self.gate_probability)
+        # Klassifikationsfragen: ein Abschnitt, jeweils das erste Kriterium sicher.
+        answers = {q: {"probabilities": {c: float(i == 0) for i, c in enumerate(spec["criteria"])}}
+                   for q, spec in extra.items()}
+        return GateResult(probability=self.gate_probability,
+                          sections=[Section(0, len(text), text, answers)])
 
     def classify(self, text: str, entities: list[Entity]) -> list[Entity]:
         self.classified = True
