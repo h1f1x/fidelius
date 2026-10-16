@@ -7,6 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from fidelius import config, main
+from fidelius.laya_client import GateResult
 from fidelius.main import app
 from fidelius.pipeline import Pipeline
 
@@ -17,8 +18,8 @@ BODY = {"text": "Herr Emre Yilmaz wohnt in Berlin.", "gate_threshold": 0.5, "for
 class HarmlessLaya:
     """Stuft jeden Text als harmlos ein, dann laufen weder Erkenner noch Bestätigung."""
 
-    def gate(self, text: str) -> float:
-        return 0.1
+    def gate(self, text: str) -> GateResult:
+        return GateResult(probability=0.1)
 
 
 @pytest.fixture

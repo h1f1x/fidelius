@@ -51,7 +51,7 @@ class Pipeline:
         gate_note = None
         prob: float | None = None
         try:
-            prob = self.laya.gate(text)
+            prob = self.laya.gate(text).probability
         except Exception as exc:  # Laya nicht erreichbar: Erkennung trotzdem erlauben
             log.warning("Laya-Gate fehlgeschlagen: %s", exc)
             gate_note = f"Laya nicht erreichbar ({exc.__class__.__name__}); Gate übersprungen."
