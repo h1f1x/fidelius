@@ -99,7 +99,7 @@ mkdir -p local && cp klassifikation.example.yaml local/klassifikation.yaml
 
 ```yaml
 freigegeben_bis: intern   # id der höchsten Stufe, die ohne Warnung durchgeht
-schwelle: 0.3             # optional; eine Stufe zählt ab dieser Wahrscheinlichkeit
+schwelle: 0.4             # optional; eine Stufe zählt ab dieser Wahrscheinlichkeit
 stufen:                   # von niedrig nach hoch, die Reihenfolge ist die Rangfolge
   - id: oeffentlich
     name: Öffentlich
@@ -172,7 +172,7 @@ schickt die Texte aus `examples/klassifikation/` an `/api/classify` und vergleic
 ```bash
 make classification-examples                                        # examples/klassifikation
 make classification-examples ARGS="--dir local/klassifikation-beispiele"  # eigene Regeln
-make classification-examples ARGS="--zugang-threshold 0.4"          # andere Zugangsdaten-Schwelle
+make classification-examples ARGS="--zugang-threshold 0.8"          # andere Zugangsdaten-Schwelle
 ```
 
 Ausgabe: je Text Soll- und Ist-Stufe und der höchste `zugang`-Wert, dann die Konfusionsmatrix
@@ -287,7 +287,7 @@ App protokolliert, gelten dort als wesentliche Änderung und gehen vorher an den
 | `NOTICE_FILE` | /opt/local/hinweise.md | Pfad im Container für die Hinweise dieser Installation im Splash-Screen; `./local` ist dorthin gemountet |
 | `CLASSIFICATION_ENABLED` | 0 | `1` schaltet die Klassifikation an (siehe Klassifikation), wirkt nach Neustart des Containers |
 | `CLASSIFICATION_FILE` | /opt/local/klassifikation.yaml | Pfad im Container für die Klassifikationsregeln dieser Installation |
-| `ZUGANG_THRESHOLD` | 0.5 | Laya-Wert der Frage `zugang` in einem Abschnitt, ab dem die Klassifikation vor Zugangsdaten warnt |
+| `ZUGANG_THRESHOLD` | 0.9 | Laya-Wert der Frage `zugang` in einem Abschnitt, ab dem die Klassifikation vor Zugangsdaten warnt |
 | `REQUEST_LOG` | /var/log/fidelius/requests.jsonl | Pfad im Container für das Request-Log (eine JSON-Zeile je Prüfung, ohne Text); nur unter `/var/log/fidelius` liegt es auf dem Volume `request-log` |
 
 Kategorien, Farben, Label-Zuordnungen und die Laya-Fragen stehen in `app/fidelius/config.py`.

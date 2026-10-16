@@ -5,7 +5,7 @@ Aufruf (App läuft unter http://localhost:8080, Klassifikation an):
     python3 scripts/run_classification.py                          # examples/klassifikation
     python3 scripts/run_classification.py --dir local/klassifikation-beispiele
     python3 scripts/run_classification.py 03 07                    # nur Texte mit diesem Präfix
-    python3 scripts/run_classification.py --zugang-threshold 0.4   # andere Zugangsdaten-Schwelle
+    python3 scripts/run_classification.py --zugang-threshold 0.8   # andere Zugangsdaten-Schwelle
     python3 scripts/run_classification.py --json out.json          # Rohergebnis speichern
 
 Die expected.json ordnet jedem Text (Dateiname ohne .txt) die erwartete Stufe zu und ob er
@@ -112,8 +112,8 @@ def main() -> int:
     ap.add_argument("prefixes", nargs="*")
     ap.add_argument("--url", default="http://localhost:8080")
     ap.add_argument("--dir", type=Path, default=DEFAULT_DIR, help="Verzeichnis mit *.txt und expected.json")
-    ap.add_argument("--zugang-threshold", type=float, default=0.5,
-                    help="ab diesem zugang-Wert zählen Zugangsdaten, wie ZUGANG_THRESHOLD (Standard 0.5)")
+    ap.add_argument("--zugang-threshold", type=float, default=0.9,
+                    help="ab diesem zugang-Wert zählen Zugangsdaten, wie ZUGANG_THRESHOLD (Standard 0.9)")
     ap.add_argument("--json", help="Rohantworten von /api/classify in diese Datei schreiben")
     args = ap.parse_args()
 

@@ -118,7 +118,7 @@ ZUGANG_CATEGORY = {"label": "Zugangsdaten", "color": "#b71540"}
 # nicht in LAYA_CHECKED_CATEGORIES: NICHT_SENSIBEL lehnte ein Passwort wie „Sommer2026!“ zu leicht ab.
 ZUGANG_GLINER_LABELS = {"password", "secret", "api_key"}
 # Ab diesem Wert der Laya-Frage nach Zugangsdaten gilt ein Abschnitt als betroffen.
-ZUGANG_THRESHOLD = float(os.environ.get("ZUGANG_THRESHOLD", "0.5"))
+ZUGANG_THRESHOLD = float(os.environ.get("ZUGANG_THRESHOLD", "0.9"))
 
 # Eine JSON-Zeile je Prüfung für die spätere Auswertung (Textlängen, Gate-Quote, Dauern).
 # Liegt auf einem Volume, weil docker logs einen Deploy nicht überdauert.

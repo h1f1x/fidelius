@@ -9,12 +9,12 @@
 # schwelle:        eine Stufe zählt ab dieser Wahrscheinlichkeit, die höchste gewinnt
 
 freigegeben_bis: intern
-schwelle: 0.3
+schwelle: 0.4
 
 stufen:
   - id: oeffentlich
     name: Öffentlich
-    laya: Veröffentlichte Information wie Pressemitteilung, Webseite, Gesetzestext, Urteil oder Geschäftsbericht
+    laya: Veröffentlichter Text für alle, etwa Pressemitteilung, Webseite, Gesetz oder Urteil
     text: |
       **Definition:** Informationen, die für die Öffentlichkeit bestimmt und rechtmäßig veröffentlicht sind,
       etwa Pressemitteilungen, Webseiten, Gesetze und veröffentlichte Geschäftsberichte.
@@ -23,7 +23,7 @@ stufen:
 
   - id: intern
     name: Intern
-    laya: Interne Arbeitsunterlage, Besprechungsprotokoll, Rundschreiben oder aggregierte Statistik ohne Geschäftsgeheimnisse
+    laya: Für alle Mitarbeitenden bestimmt, ohne Angaben zu einzelnen Kunden, etwa Besprechungsprotokoll, Rundschreiben oder Statistik
     text: |
       **Definition:** Nicht öffentliche Informationen, deren Offenlegung nur begrenzte Nachteile hätte,
       etwa interne Arbeitsunterlagen, Protokolle oder anonymisierte, aggregierte Auswertungen.
@@ -32,7 +32,7 @@ stufen:
 
   - id: vertraulich
     name: Vertraulich
-    laya: Geschäftsgeheimnis, interne Finanzzahlen, Vertrags- oder Schadendaten einzelner Kunden, nicht öffentlicher Quellcode oder Sicherheitsinformation wie Schwachstelle, Netzwerkplan oder Firewall-Regel
+    laya: Nur für wenige Beteiligte bestimmt, etwa Kunden- oder Mandantenakte, Vertrag, Schadenfall, Finanzzahlen, Verhandlungsstrategie oder IT-Zugänge
     text: |
       **Definition:** Nicht öffentliche Informationen, deren Offenlegung rechtliche, wirtschaftliche oder
       sicherheitsbezogene Nachteile haben kann oder die einer Geheimhaltungspflicht unterliegen, etwa
@@ -43,7 +43,7 @@ stufen:
 
   - id: streng_vertraulich
     name: Streng vertraulich
-    laya: Gesundheitsdaten wie Diagnose, Befund oder Arztbrief, Personalakte, Disziplinarvorgang oder Insider-Information
+    laya: Diagnose, Befund oder Krankheit einer bestimmten Person, Personalakte oder Insider-Information
     text: |
       **Definition:** Informationen, deren Offenlegung schwerwiegende Schäden verursachen kann, etwa
       Gesundheitsdaten aus Arztbriefen oder Gutachten, besonders sensible Personalangelegenheiten oder

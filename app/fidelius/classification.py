@@ -15,8 +15,8 @@ from .models import ChunkLevel, Classification, Span, TextLevel
 if TYPE_CHECKING:
     from .laya_client import Section
 
-# Startwert, bis die Kalibrierbeispiele einen besseren liefern (docs/specs/klassifikation.md).
-DEFAULT_THRESHOLD = 0.3
+# Mit den Kalibrierbeispielen festgelegt (docs/specs/klassifikation.md, Abschnitt 9).
+DEFAULT_THRESHOLD = 0.4
 
 
 class RulesError(ValueError):

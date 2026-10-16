@@ -6,7 +6,7 @@ export GATE_THRESHOLD=0.5     # Standard-Schwellwert für die Laya-Gesamtbewertu
 export LAYA_REJECT_THRESHOLD=0.9  # ab dieser Wahrscheinlichkeit für "nicht sensibel" lehnt Laya einen Treffer ab
 export REQUEST_LOG=/var/log/fidelius/requests.jsonl  # Request-Log im Container, liegt auf dem Volume request-log
 # export CLASSIFICATION_ENABLED=0  # 1 schaltet die Klassifikation an, braucht local/klassifikation.yaml
-# export ZUGANG_THRESHOLD=0.5  # ab diesem Laya-Wert gilt ein Abschnitt als Zugangsdaten, nur bei aktiver Klassifikation
+# export ZUGANG_THRESHOLD=0.9  # ab diesem Laya-Wert gilt ein Abschnitt als Zugangsdaten, nur bei aktiver Klassifikation
 
 # Deployment (make deploy), siehe docs/deployen.md
 # export DEPLOY_HOST=user@vm  # ssh-Ziel, user@host oder Alias aus ~/.ssh/config
