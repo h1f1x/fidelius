@@ -1,0 +1,56 @@
+# Klassifikationsregeln einer Installation, Beispiel. Kopie als local/klassifikation.yaml anlegen
+# und an die eigenen Regeln anpassen; aktiv nur mit CLASSIFICATION_ENABLED=1.
+# Format und Verhalten: README, Abschnitt „Klassifikation“, und docs/specs/klassifikation.md.
+#
+# stufen:          von niedrig nach hoch, die Reihenfolge ist die Rangfolge
+#   laya:          Kurzbeschreibung für Laya, ein bis zwei Zeilen mit konkreten Beispielen
+#   text:          Markdown für die Anzeige im Warnbanner
+# freigegeben_bis: id der höchsten Stufe, die ohne Warnung in das KI-System darf
+# schwelle:        eine Stufe zählt ab dieser Wahrscheinlichkeit, die höchste gewinnt
+
+freigegeben_bis: intern
+schwelle: 0.3
+
+stufen:
+  - id: oeffentlich
+    name: Öffentlich
+    laya: Veröffentlichte Information wie Pressemitteilung, Webseite, Gesetzestext, Urteil oder Geschäftsbericht
+    text: |
+      **Definition:** Informationen, die für die Öffentlichkeit bestimmt und rechtmäßig veröffentlicht sind,
+      etwa Pressemitteilungen, Webseiten, Gesetze und veröffentlichte Geschäftsberichte.
+
+      **KI-Nutzung:** zulässig, sofern keine Rechte Dritter verletzt werden, insbesondere keine Urheberrechte.
+
+  - id: intern
+    name: Intern
+    laya: Interne Arbeitsunterlage, Besprechungsprotokoll, Rundschreiben oder aggregierte Statistik ohne Geschäftsgeheimnisse
+    text: |
+      **Definition:** Nicht öffentliche Informationen, deren Offenlegung nur begrenzte Nachteile hätte,
+      etwa interne Arbeitsunterlagen, Protokolle oder anonymisierte, aggregierte Auswertungen.
+
+      **KI-Nutzung:** zulässig in KI-Systemen, die für interne Informationen freigegeben sind.
+
+  - id: vertraulich
+    name: Vertraulich
+    laya: Geschäftsgeheimnis, interne Finanzzahlen, Vertrags- oder Schadendaten einzelner Kunden, nicht öffentlicher Quellcode oder Sicherheitsinformation wie Schwachstelle, Netzwerkplan oder Firewall-Regel
+    text: |
+      **Definition:** Nicht öffentliche Informationen, deren Offenlegung rechtliche, wirtschaftliche oder
+      sicherheitsbezogene Nachteile haben kann oder die einer Geheimhaltungspflicht unterliegen, etwa
+      Vertrags- und Schadendaten einzelner Versicherungsnehmer, Mandatsunterlagen einer Kanzlei,
+      interne Finanzzahlen, Quellcode, Schwachstellenberichte oder Netzwerkpläne.
+
+      **KI-Nutzung:** nur in KI-Systemen, die für vertrauliche Informationen freigegeben sind.
+
+  - id: streng_vertraulich
+    name: Streng vertraulich
+    laya: Gesundheitsdaten wie Diagnose, Befund oder Arztbrief, Personalakte, Disziplinarvorgang oder Insider-Information
+    text: |
+      **Definition:** Informationen, deren Offenlegung schwerwiegende Schäden verursachen kann, etwa
+      Gesundheitsdaten aus Arztbriefen oder Gutachten, besonders sensible Personalangelegenheiten oder
+      Insider-Informationen.
+
+      **KI-Nutzung:** grundsätzlich nicht zulässig, Ausnahmen nur nach dokumentierter Einzelfallfreigabe.
+
+zugangsdaten:
+  text: |
+    Passwörter, Tokens, API-Keys, private Schlüssel und andere Zugangsdaten dürfen nie in ein KI-System.

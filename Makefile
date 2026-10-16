@@ -15,7 +15,7 @@ MIN_DOCKER_MEM_GB ?= 7
 WAIT_TIMEOUT ?= 1800
 # Die Unit-Tests brauchen keine Modelle, deshalb nur diese Pakete statt aller Abhängigkeiten.
 # httpx2 bleibt auf demselben Pin wie in app/pyproject.toml, die Begründung steht dort.
-TEST_DEPS := --with pydantic --with httpx --with httpx2==2.10.0 --with fastapi --with pytest --with google-re2
+TEST_DEPS := --with pydantic --with httpx --with httpx2==2.10.0 --with fastapi --with pytest --with google-re2 --with pyyaml
 
 .PHONY: help init up down logs status test examples loadtest loadtest-report deploy remote-login \
         _tools-Darwin _tools-Linux _runtime-Darwin _runtime-Linux _start-Darwin _start-Linux \

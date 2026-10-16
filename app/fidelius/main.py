@@ -11,7 +11,7 @@ from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import build_info, config, log_report
+from . import build_info, classification, config, log_report
 from .calibration import Calibration
 from .detectors import gliner, spacy_det
 from .models import AnalyzeRequest, AnalyzeResponse, ApplyRequest, ApplyResponse
@@ -66,7 +66,8 @@ def health() -> dict:
         laya = pipeline.laya.health()
     except Exception as exc:
         laya = f"nicht erreichbar: {exc.__class__.__name__}"
-    return {"status": "ok", "laya": laya, "laya_url": config.LAYA_URL}
+    return {"status": "ok", "laya": laya, "laya_url": config.LAYA_URL,
+            "classification": classification.active_rules()[1]}
 
 
 @app.get("/api/config")
@@ -80,6 +81,19 @@ def get_config() -> dict:
         "calibration": calibration.as_dict(),
         "build": build_info.build(),
         "notice": _notice(),
+        "classification": _classification_config(),
+    }
+
+
+def _classification_config() -> dict | None:
+    """Stufen für die Anzeige; die Kurzbeschreibungen für Laya bleiben auf dem Server."""
+    rules, _ = classification.active_rules()
+    if rules is None:
+        return None
+    return {
+        "levels": [{"id": lv.id, "name": lv.name, "text": lv.text} for lv in rules.levels],
+        "freigegeben_bis": rules.approved_up_to,
+        "zugangsdaten_text": rules.credentials_text,
     }
 
 
