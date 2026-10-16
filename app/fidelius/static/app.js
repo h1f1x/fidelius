@@ -270,10 +270,18 @@
   // ---------- Ergebnis: eine Box, zwei Ansichten ----------
   let viewMode = "annot";  // "annot": Original durchgestrichen + Platzhalter; "plain": so wie kopiert
 
-  function tokens(text, ents, mode) {
+  // Klassen und Hinweis für Stellen im auslösenden Abschnitt (classmark.js); leer außerhalb.
+  const TRIG_TITLE = { original: "bestimmt die Schutzstufe des Originals", anonymized: "bestimmt die Schutzstufe des anonymisierten Texts" };
+  const trigAttrs = (kinds) => kinds.length ? { cls: " trig " + kinds.map((k) => "trig-" + k).join(" "), title: "Dieser Abschnitt " + kinds.map((k) => TRIG_TITLE[k]).join(" und ") } : { cls: "", title: "" };
+
+  function tokens(text, ents, mode, ranges = []) {
     // Freie Textstücke tragen ihren Offset im Original, damit sich eine Markierung zurückrechnen lässt.
+    // An den Grenzen eines auslösenden Abschnitts wird ein Stück geteilt; jedes Teil behält seinen Offset.
     let html = "", pos = 0;
-    const plain = (a, b) => a < b ? `<span data-o="${a}">${esc(text.slice(a, b))}</span>` : "";
+    const plain = (a, b) => ClassMark.pieces(a, b, ranges).map((p) => {
+      const t = trigAttrs(p.kinds);
+      return `<span data-o="${p.start}"${t.cls ? ` class="${t.cls.trim()}" title="${t.title}"` : ""}>${esc(text.slice(p.start, p.end))}</span>`;
+    }).join("");
     for (const e of ents) {
       if (e.start < pos) continue;
       html += plain(pos, e.start);
@@ -281,13 +289,13 @@
       const badges = groupSources(e.sources).map((g) => `<b title="${esc(g.title)}">${SOURCE_BADGE[g.name] || "?"}</b>`).join("") + (e.sources.length ? "" : '<b title="manuell markiert">M</b>');
       const laya = e.laya ? `<span class="${e.laya.accepted ? "ok" : "no"}" title="Laya: ${esc(e.laya.category)} ${(e.laya.probability * 100).toFixed(0)}%">L${e.laya.accepted ? "✓" : "✗"}</span>` : "";
       const bd = `<span class="badges expert-only">${badges}${laya}</span>`;
-      const st = `style="--c:${color(e.category)}" data-id="${e.id}"`;
+      const st = `style="--c:${color(e.category)}" data-id="${e.id}"`, tr = trigAttrs(ClassMark.kindsAt(e.start, e.end, ranges)).cls;
       if (rejected) {
-        html += mode === "plain" ? esc(e.text) : `<mark class="ent rejected" ${st} title="${esc(label(e.category))}, bleibt stehen"><s>${esc(e.text)}</s>${bd}</mark>`;
+        html += mode === "plain" ? esc(e.text) : `<mark class="ent rejected${tr}" ${st} title="${esc(label(e.category))}, bleibt stehen"><s>${esc(e.text)}</s>${bd}</mark>`;
       } else if (mode === "plain") {
-        html += `<mark class="ent chip" ${st} title="Original: ${esc(e.text)}">${esc(e.placeholder)}${bd}</mark>`;
+        html += `<mark class="ent chip${tr}" ${st} title="Original: ${esc(e.text)}">${esc(e.placeholder)}${bd}</mark>`;
       } else {
-        html += `<mark class="ent" ${st} title="${esc(label(e.category))}"><s>${esc(e.text)}</s><span class="ph">${esc(e.placeholder)}</span>${bd}</mark>`;
+        html += `<mark class="ent${tr}" ${st} title="${esc(label(e.category))}"><s>${esc(e.text)}</s><span class="ph">${esc(e.placeholder)}</span>${bd}</mark>`;
       }
       pos = e.end;
     }
@@ -301,8 +309,10 @@
     area.innerHTML = `<div class="resulthead"><h2>Anonymisierter Text</h2><div class="seg"><button data-view="annot" class="${viewMode === "annot" ? "on" : ""}">mit Markierungen</button><button data-view="plain" class="${viewMode === "plain" ? "on" : ""}">so wie er kopiert wird</button></div><button id="copyAnon" class="primary">Anonymisierten Text kopieren</button></div>
       <div class="viewnote">${viewMode === "annot" ? "Durchgestrichen = Original, farbig = Platzhalter. Kopiert wird nur der anonymisierte Text, ohne Originale. Klick auf eine Stelle, um sie zu ändern." : "Genau dieser Text landet in der Zwischenablage. Klick auf einen Platzhalter zeigt das Original."}</div>
       ${classificationHtml()}
-      <div class="annotated-text${viewMode === "plain" ? " plain" : ""}">${empty || tokens(text, ents, viewMode)}</div>`;
+      <div class="annotated-text${viewMode === "plain" ? " plain" : ""}">${empty || tokens(text, ents, viewMode, ClassMark.triggerRanges(CONFIG.classification && state.classification, state.entities))}</div>`;
     area.querySelectorAll(".seg button").forEach((b) => { b.onclick = () => { viewMode = b.dataset.view; renderResult(); }; });
+    // Klick auf eine Stufe im Badge springt zum Abschnitt, der sie bestimmt hat.
+    area.querySelectorAll(".classbadge .lvl[data-jump]").forEach((b) => { b.onclick = () => jumpToTrigger(b.dataset.jump); });
   }
 
 
@@ -315,13 +325,20 @@
     if (!c.original) return `<div class="classbadge"><span class="muted">Schutzstufe: ${esc(c.note || "keine Einschätzung möglich")}</span></div>`;
     const level = (id) => rules.levels.find((l) => l.id === id) || { id, name: id, text: "" };
     const rank = (id) => rules.levels.findIndex((l) => l.id === id);
-    const chip = (t) => `<span class="lvl${rank(t.level) > rank(rules.freigegeben_bis) ? " over" : ""}">${esc(level(t.level).name)}</span>`;
-    const badge = c.anonymized ? `Original: ${chip(c.original)} → Anonymisiert: ${chip(c.anonymized)}` : chip(c.original);
+    const chip = (t, kind) => `<button type="button" class="lvl${rank(t.level) > rank(rules.freigegeben_bis) ? " over" : ""}" data-jump="${kind}" title="Zum Abschnitt springen, der die Stufe bestimmt">${esc(level(t.level).name)}</button>`;
+    const badge = c.anonymized ? `Original: ${chip(c.original, "original")} → Anonymisiert: ${chip(c.anonymized, "anonymized")}` : chip(c.original, "original");
     // Maßgeblich ist der Text, der in die KI geht: der anonymisierte, solange es keine eigene Bewertung gibt das Original.
     const rule = level((c.anonymized || c.original).level).text;
     const banner = c.warn ? `<div class="classwarn" role="alert"><strong>Die Schutzstufe liegt über der Freigabe für KI-Systeme. Es gilt:</strong>${rule ? markdown(rule) : ""}</div>` : "";
     const note = c.note ? ` <span class="muted">${esc(c.note)}</span>` : "";
-    return `<div class="classbadge">Schutzstufe: ${badge}${note}</div>${banner}`;
+    return `<div class="classbadge">Schutzstufe: ${badge}${note}</div>${banner}${ClassMark.expertHtml(c, rules)}`;
+  }
+  function jumpToTrigger(kind) {
+    const el = $("resultArea").querySelector(".annotated-text .trig-" + kind);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    const all = $("resultArea").querySelectorAll(".annotated-text .trig-" + kind);
+    all.forEach((x) => { x.classList.remove("flash"); void x.offsetWidth; x.classList.add("flash"); });
   }
 
   function renderMapping() {

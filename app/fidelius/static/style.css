@@ -210,3 +210,17 @@ svg.chart .ref { stroke: var(--mark); stroke-dasharray: 3 3; }
 .classwarn { margin: 8px 0; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border); border-left: 4px solid var(--danger); font-size: 13px; }
 .classwarn p, .classwarn ul, .classwarn ol { margin: 6px 0 0; }
 .classwarn h3, .classwarn h4 { margin: 6px 0 0; font-size: 13px; }
+/* Auslösender Abschnitt (classmark.js): Original unterstrichen, anonymisierter Text hinterlegt. */
+.annotated-text .trig-original { text-decoration: underline dashed color-mix(in srgb, var(--primary) 70%, transparent); text-underline-offset: 3px; }
+.annotated-text .trig-anonymized { background-color: color-mix(in srgb, var(--primary) 12%, transparent); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+.annotated-text .trig.flash { animation: trigflash 1.2s ease-out; }
+@keyframes trigflash { from { outline: 2px solid var(--primary); } to { outline: 2px solid transparent; } }
+.classbadge button.lvl { cursor: pointer; font: inherit; font-weight: 600; }
+body.expert .classexpert.expert-only { display: block !important; }
+.classexpert { margin: 8px 0; font-size: 12px; overflow-x: auto; }
+.classexpert h4 { margin: 6px 0 2px; font-size: 12px; }
+.classexpert table { border-collapse: collapse; width: auto; }
+.classexpert th, .classexpert td { padding: 2px 8px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.classexpert th:nth-child(-n+2), .classexpert td:nth-child(-n+2) { text-align: left; }
+.classexpert td.hit { font-weight: 700; }
+.classexpert tr.trig td { background: color-mix(in srgb, var(--primary) 12%, transparent); }
