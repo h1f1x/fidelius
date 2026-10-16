@@ -114,6 +114,9 @@ def categories(rules: Rules | None) -> dict[str, dict[str, str]]:
 
 LEVEL_QUESTION = "stufe"
 LEVEL_INSTRUCTIONS = "Welcher Schutzstufe gehört dieser Text an?"
+CREDENTIALS_QUESTION = "zugang"
+CREDENTIALS_INSTRUCTIONS = ("Enthält dieser Text ein Passwort, einen Token, einen API-Key, "
+                            "einen privaten Schlüssel oder andere Zugangsdaten?")
 
 
 def questions(rules: Rules) -> dict[str, dict]:
@@ -122,11 +125,14 @@ def questions(rules: Rules) -> dict[str, dict]:
     Sie laufen für das Original als `extra` im Gate-Batch mit. Die Kriterien sind die
     `laya`-Kurzfassungen unter der Stufen-id, so kommen die Wahrscheinlichkeiten je id zurück.
     """
-    return {LEVEL_QUESTION: {
-        "type": "choice",
-        "instructions": LEVEL_INSTRUCTIONS,
-        "criteria": {lv.id: lv.laya for lv in rules.levels},
-    }}
+    return {
+        LEVEL_QUESTION: {
+            "type": "choice",
+            "instructions": LEVEL_INSTRUCTIONS,
+            "criteria": {lv.id: lv.laya for lv in rules.levels},
+        },
+        CREDENTIALS_QUESTION: {"type": "noul", "instructions": CREDENTIALS_INSTRUCTIONS},
+    }
 
 
 def assess(rules: Rules, sections: Sequence[Section]) -> TextLevel:
@@ -146,7 +152,15 @@ def _chunk_level(rules: Rules, section: Section) -> ChunkLevel:
     probs = {lv.id: float(raw.get(lv.id, 0.0)) for lv in rules.levels}
     above = [lv.id for lv in rules.levels if probs[lv.id] >= rules.threshold]
     level = above[-1] if above else max(probs, key=probs.get)
-    return ChunkLevel(start=section.start, end=section.end, level=level, probabilities=probs)
+    creds = section.answers.get(CREDENTIALS_QUESTION)
+    return ChunkLevel(start=section.start, end=section.end, level=level, probabilities=probs,
+                      credentials=float(creds["noul"]) if creds else None)
+
+
+def credentials_likely(level: TextLevel) -> bool:
+    """Ob Laya in einem Abschnitt Zugangsdaten sieht, also `zugang` ab `ZUGANG_THRESHOLD`."""
+    return any(c.credentials is not None and c.credentials >= config.ZUGANG_THRESHOLD
+               for c in level.chunks)
 
 
 def summarize(rules: Rules, original: TextLevel | None, anonymized: TextLevel | None = None,

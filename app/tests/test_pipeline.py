@@ -21,8 +21,9 @@ class FakeLaya:
             raise ConnectionError("Laya ist weg")
         if not extra:
             return GateResult(probability=self.gate_probability)
-        # Klassifikationsfragen: ein Abschnitt, jeweils das erste Kriterium sicher.
+        # Klassifikationsfragen: ein Abschnitt, jeweils das erste Kriterium sicher, noul klar nein.
         answers = {q: {"probabilities": {c: float(i == 0) for i, c in enumerate(spec["criteria"])}}
+                   if spec["type"] == "choice" else {"noul": 0.0}
                    for q, spec in extra.items()}
         return GateResult(probability=self.gate_probability,
                           sections=[Section(0, len(text), text, answers)])

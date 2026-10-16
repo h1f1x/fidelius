@@ -148,6 +148,10 @@ def test_level_questions_run_in_the_single_gate_batch(enabled):
         "instructions": "Welcher Schutzstufe gehört dieser Text an?",
         "criteria": {"oeffentlich": "Veröffentlichte Information", "intern": "Interne Arbeitsunterlage",
                      "vertraulich": "Geschäftsgeheimnis"},
+    }, "zugang": {
+        "type": "noul",
+        "instructions": "Enthält dieser Text ein Passwort, einen Token, einen API-Key, "
+                        "einen privaten Schlüssel oder andere Zugangsdaten?",
     }}]
 
 
@@ -200,7 +204,8 @@ def test_anonymized_text_gets_its_own_level_from_a_second_pass(enabled):
     assert c["anonymized"]["chunk"] == {"start": 0, "end": len(PERSON_ANON)}
     asked_text, asked_questions = laya.asked[0]
     assert asked_text == PERSON_ANON
-    assert list(asked_questions) == ["stufe"]  # keine Gate-Fragen im zweiten Durchlauf
+    # Dieselben Klassifikationsfragen wie beim Original (Spec 4), aber keine Gate-Fragen.
+    assert list(asked_questions) == ["stufe", "zugang"]
 
 
 def test_unchanged_text_gets_no_second_pass(enabled):

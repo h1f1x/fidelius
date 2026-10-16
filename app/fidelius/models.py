@@ -118,6 +118,11 @@ class AnalyzeResponse(BaseModel):
         return data
 
 
+class ClassifyRequest(BaseModel):
+    """„Neu bewerten“: der aktuelle anonymisierte Text."""
+    text: str
+
+
 class ApplyRequest(BaseModel):
     text: str
     entities: list[Entity]

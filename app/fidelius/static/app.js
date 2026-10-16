@@ -207,6 +207,7 @@
     try {
       const res = await api("/api/apply", { text: state.text, entities: state.entities });
       state.entities = res.entities; state.mapping = res.mapping; state.anonymized = res.anonymized_text;
+      markClassificationStale();
       save(); render();
     } catch (e) { showError("Die Änderung konnte nicht übernommen werden: " + e.message); }
   }
@@ -313,6 +314,7 @@
     area.querySelectorAll(".seg button").forEach((b) => { b.onclick = () => { viewMode = b.dataset.view; renderResult(); }; });
     // Klick auf eine Stufe im Badge springt zum Abschnitt, der sie bestimmt hat.
     area.querySelectorAll(".classbadge .lvl[data-jump]").forEach((b) => { b.onclick = () => jumpToTrigger(b.dataset.jump); });
+    const re = $("reclassify"); if (re) re.onclick = reclassify;
   }
 
 
@@ -329,9 +331,14 @@
     const badge = c.anonymized ? `Original: ${chip(c.original, "original")} → Anonymisiert: ${chip(c.anonymized, "anonymized")}` : chip(c.original, "original");
     // Maßgeblich ist der Text, der in die KI geht: der anonymisierte, solange es keine eigene Bewertung gibt das Original.
     const rule = level((c.anonymized || c.original).level).text;
-    const banner = c.warn ? `<div class="classwarn" role="alert"><strong>Die Schutzstufe liegt über der Freigabe für KI-Systeme. Es gilt:</strong>${rule ? markdown(rule) : ""}</div>` : "";
+    const over = [c.original, c.anonymized].some((t) => t && rank(t.level) > rank(rules.freigegeben_bis));
+    const levelPart = over ? `<div><strong>Die Schutzstufe liegt über der Freigabe für KI-Systeme. Es gilt:</strong>${rule ? markdown(rule) : ""}</div>` : "";
+    // Bleibt stehen, auch wenn alle Zugangsdaten ersetzt sind: Ein Secret in der Zwischenablage gilt als offengelegt.
+    const credPart = c.credentials ? `<div><strong>Im Original stehen Zugangsdaten. Auch wenn sie ersetzt sind, sollten sie als offengelegt gelten und ausgetauscht werden.</strong>${markdown(rules.zugangsdaten_text || "Zugangsdaten gehören nicht in KI-Systeme.")}</div>` : "";
+    const banner = c.warn ? `<div class="classwarn" role="alert">${levelPart}${credPart}</div>` : "";
     const note = c.note ? ` <span class="muted">${esc(c.note)}</span>` : "";
-    return `<div class="classbadge">Schutzstufe: ${badge}${note}</div>${banner}${ClassMark.expertHtml(c, rules)}`;
+    const stale = c.stale ? ` <span class="stale">veraltet</span> <button id="reclassify" class="small"${reclassifying ? " disabled" : ""}>${reclassifying ? "bewerte …" : "neu bewerten"}</button>` : "";
+    return `<div class="classbadge">Schutzstufe: ${badge}${stale}${note}</div>${banner}${ClassMark.expertHtml(c, rules)}`;
   }
   function jumpToTrigger(kind) {
     const el = $("resultArea").querySelector(".annotated-text .trig-" + kind);
@@ -339,6 +346,35 @@
     el.scrollIntoView({ behavior: "smooth", block: "center" });
     const all = $("resultArea").querySelectorAll(".annotated-text .trig-" + kind);
     all.forEach((x) => { x.classList.remove("flash"); void x.offsetWidth; x.classList.add("flash"); });
+  }
+
+  // Eine Korrektur ändert den anonymisierten Text, ruft aber kein Modell auf. Die Bewertung bleibt stehen,
+  // gilt aber für den alten Text: Ihre Abschnitte (anonymized.chunk/chunks) passen nicht mehr zu
+  // state.anonymized, bis „neu bewerten“ sie ersetzt. Ohne Bewertung des Originals gibt es nichts zu ersetzen.
+  function markClassificationStale() {
+    const c = state.classification;
+    if (c && c.original && CONFIG.classification) c.stale = true;
+  }
+
+  // Ersetzt nur die Bewertung des anonymisierten Texts; das Original ist von Korrekturen unberührt.
+  // Der Ladezustand steht nicht in state, sonst bliebe der Button nach einem Neuladen gesperrt.
+  let reclassifying = false;
+  async function reclassify() {
+    const c = state.classification, rules = CONFIG.classification, text = state.anonymized;
+    if (!c || !rules) return;
+    reclassifying = true; renderResult();
+    try {
+      const anonymized = await api("/api/classify", { text });
+      // Kam während der Bewertung eine weitere Korrektur, gehört das Ergebnis zu einem alten Text.
+      if (state.classification !== c || state.anonymized !== text) return;
+      const over = (t) => t && rules.levels.findIndex((l) => l.id === t.level) > rules.levels.findIndex((l) => l.id === rules.freigegeben_bis);
+      Object.assign(c, { anonymized, warn: Boolean(c.credentials || over(c.original) || over(anonymized)), note: null, stale: false });
+      showError(null);
+    } catch (e) {
+      showError("Die Schutzstufe konnte nicht neu bewertet werden: " + e.message + ". Die alte Bewertung bleibt als veraltet stehen.");
+    } finally {
+      reclassifying = false; save(); renderResult();
+    }
   }
 
   function renderMapping() {
