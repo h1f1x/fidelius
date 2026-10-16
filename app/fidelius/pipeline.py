@@ -107,7 +107,10 @@ class Pipeline:
         # 5. Platzhalter
         entities = assign_placeholders(entities)
         anonymized_text = anonymize(text, entities)
-        classified = _classify_original(rules, result, laya_error, credentials_found) if rules else None
+        classified = None
+        if rules:
+            classified = _classify_original(rules, result, laya_error, credentials_found)
+            timing.classification_ms = 0
         # 6. Schutzstufe des anonymisierten Texts, nur wenn er sich vom Original unterscheidet
         if classified and classified.original and anonymized_text != text:
             t3 = self.clock()

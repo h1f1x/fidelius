@@ -90,6 +90,7 @@ def test_without_flag_no_classification_and_no_extra_questions(rules_file, monke
     res = analyze_http(laya, TEXT)
 
     assert "classification" not in res
+    assert "classification_ms" not in res["timing"]  # Antwort wie ohne Klassifikation
     assert laya.extras == [None]
 
 
