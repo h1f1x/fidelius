@@ -39,10 +39,12 @@
   // Die Abschnitte, die die Stufe des Originals und des anonymisierten Texts bestimmt haben, beide in
   // Offsets des Originals. Wird bei jedem Rendern aus der aktuellen Bewertung neu berechnet, damit eine
   // ersetzte Bewertung des anonymisierten Texts („neu bewerten“) sofort an der richtigen Stelle sitzt.
+  // Ist sie veraltet (`stale`), gehören ihre Offsets zu einem früheren anonymisierten Text und
+  // würden an falscher Stelle landen; dann bleibt nur die Markierung des Originals.
   function triggerRanges(c, ents) {
     if (!c || !c.original) return [];
     const out = [{ ...c.original.chunk, kind: "original" }];
-    if (c.anonymized) out.push({ ...toOriginal(c.anonymized.chunk.start, c.anonymized.chunk.end, ents), kind: "anonymized" });
+    if (c.anonymized && !c.stale) out.push({ ...toOriginal(c.anonymized.chunk.start, c.anonymized.chunk.end, ents), kind: "anonymized" });
     return out.map(({ start, end, kind }) => ({ start, end, kind }));
   }
 
@@ -82,7 +84,7 @@
       return `<h4>${title}</h4><table>${head}${rows}</table>`;
     };
     const parts = [table(c.anonymized ? "Original" : "Text", c.original)];
-    if (c.anonymized) parts.push(table("Anonymisiert", c.anonymized));
+    if (c.anonymized) parts.push(table(c.stale ? "Anonymisiert (veraltet)" : "Anonymisiert", c.anonymized));
     return `<div class="classexpert expert-only"><div class="muted">Je Abschnitt · Schwelle ${pct(rules.schwelle)}</div>${parts.join("")}</div>`;
   }
 

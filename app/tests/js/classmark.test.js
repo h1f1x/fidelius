@@ -41,6 +41,14 @@ test("ohne Bewertung des anonymisierten Texts nur der des Originals, ohne Bewert
   assert.deepEqual(M.triggerRanges(null, ENTS), []);
 });
 
+test("eine veraltete Bewertung markiert den anonymisierten Text nicht, ihre Offsets gehören zum alten", () => {
+  const c = { original: { level: "vertraulich", chunk: { start: 0, end: 11 } },
+              anonymized: { level: "intern", chunk: { start: 15, end: 33 } }, stale: true };
+  assert.deepEqual(M.triggerRanges(c, ENTS), [{ start: 0, end: 11, kind: "original" }]);
+  const t = { level: "intern", chunk: { start: 0, end: 10 }, chunks: [chunk(0, 10, "intern", { intern: 0.9 })] };
+  assert.match(M.expertHtml({ original: t, anonymized: t, stale: true }, RULES), /Anonymisiert \(veraltet\)/);
+});
+
 test("ein freies Textstück wird an den Grenzen der Abschnitte geteilt", () => {
   const ranges = [{ start: 0, end: 11, kind: "original" }, { start: 8, end: 26, kind: "anonymized" }];
   assert.deepEqual(M.pieces(4, 15, ranges), [
