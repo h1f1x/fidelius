@@ -1,0 +1,15 @@
+Betreff: Anbindung Dokumentenmanagement an die Kanzleisoftware
+
+Hallo Herr Neumann,
+
+wie telefonisch besprochen hier die Zugangsdaten für die Anbindung des Dokumentenmanagements an unsere Kanzleisoftware. Die Mandatsakten sollen ab November automatisch synchronisiert werden.
+
+Server: https://dms.kanzlei-weber-partner.example
+API-Benutzer: sync-mandate
+api_key=4e9b2c7d1a6f3e8b5c0d9a2f7e1b4c6d8a3f5e2b
+Datenbank (nur lesend): host=db01.kanzlei.local user=dms_read pwd=Akte!Lesen2026
+
+Bitte richten Sie die Synchronisation zunächst nur für das Testmandat 2026/0001 ein. Der Zugang hat Leserechte auf alle Mandatsakten, deshalb sollte er nach der Einrichtung auf den Ordner „Synchronisation“ beschränkt werden.
+
+Mit freundlichen Grüßen
+Kanzleimanagement Weber & Partner

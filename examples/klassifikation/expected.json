@@ -1,0 +1,18 @@
+{
+  "01_pressemitteilung_versicherung": {"stufe": "oeffentlich", "zugangsdaten": false},
+  "02_webseite_arztpraxis": {"stufe": "oeffentlich", "zugangsdaten": false},
+  "03_urteil_kanzlei": {"stufe": "oeffentlich", "zugangsdaten": false},
+  "04_protokoll_versicherung": {"stufe": "intern", "zugangsdaten": false},
+  "05_rundschreiben_arztpraxis": {"stufe": "intern", "zugangsdaten": false},
+  "06_statistik_kanzlei": {"stufe": "intern", "zugangsdaten": false},
+  "07_schadenakte_versicherung": {"stufe": "vertraulich", "zugangsdaten": false},
+  "08_finanzen_arztpraxis": {"stufe": "vertraulich", "zugangsdaten": false},
+  "09_mandat_kanzlei": {"stufe": "vertraulich", "zugangsdaten": false},
+  "10_leistungsfall_versicherung": {"stufe": "streng_vertraulich", "zugangsdaten": false},
+  "11_arztbrief_arztpraxis": {"stufe": "streng_vertraulich", "zugangsdaten": false},
+  "12_personalakte_kanzlei": {"stufe": "streng_vertraulich", "zugangsdaten": false},
+  "13_ticket_zugang_versicherung": {"stufe": "vertraulich", "zugangsdaten": true},
+  "14_praxissoftware_zugang_arztpraxis": {"stufe": "vertraulich", "zugangsdaten": true},
+  "15_api_zugang_kanzlei": {"stufe": "vertraulich", "zugangsdaten": true},
+  "16_wlan_rundschreiben_versicherung": {"stufe": "intern", "zugangsdaten": true}
+}

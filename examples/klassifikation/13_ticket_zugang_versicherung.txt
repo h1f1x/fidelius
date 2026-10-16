@@ -1,0 +1,18 @@
+Betreff: Ticket 48211 – Schnittstelle zum Gutachterportal liefert 401
+
+Hallo IT-Support,
+
+seit dem Update gestern Abend bricht der nächtliche Abgleich der Schadengutachten mit dem Portal des Sachverständigenbüros ab. Im Log steht bei jedem Aufruf „401 Unauthorized“.
+
+Ich habe die Konfiguration der Schnittstelle aus dem Batch-Server kopiert, vielleicht seht ihr den Fehler:
+
+  endpoint = https://portal.gutachten-nord.example/api/v2/reports
+  client_id = nordlicht-schaden-prod
+  client_secret = 7f3c9a1e5b2d48c6a0e9f1b7d3c5e8a2
+  user = svc_schaden_batch
+  password = Wint3r!Regul2026
+
+Der Abgleich ist für die Regulierung der Hagelschäden wichtig, die Gutachten kommen sonst nur per Mail. Könnt ihr das bis morgen früh prüfen?
+
+Danke und Gruß
+Fachbereich Schaden Kfz
