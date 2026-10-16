@@ -80,6 +80,61 @@ Zur betrieblichen Nutzung bei **Schraubenhuber & Co. KG** beachtet bitte auch di
 `make deploy` überträgt `local/` nicht und löscht es auf der VM auch nicht. Dort legt man die Datei
 einmal selbst ab, z. B. nach `make remote-login`.
 
+## Klassifikation
+
+Fidelius kann einschätzen, welcher Schutzstufe ein Text nach den Regeln der Installation angehört,
+und warnen, wenn eine Stufe über der Freigabe liegt. Es sperrt nichts. Die Funktion ist aus, bis
+eine Installation sie mit `CLASSIFICATION_ENABLED=1` einschaltet; ausgeschaltet verhält sich
+Fidelius wie ohne sie und liest die Regeldatei nicht. Hintergrund:
+[docs/specs/klassifikation.md](docs/specs/klassifikation.md) und
+[ADR-0001](docs/adr/0001-klassifikation-warnt-je-installation.md).
+
+Die Schutzstufen einer Organisation gehören nicht ins Repo, sondern nach `local/klassifikation.yaml`
+(im Container `/opt/local/klassifikation.yaml`, änderbar mit `CLASSIFICATION_FILE`). Als Vorlage
+dient [klassifikation.example.yaml](klassifikation.example.yaml) mit vier generischen Stufen:
+
+```bash
+mkdir -p local && cp klassifikation.example.yaml local/klassifikation.yaml
+```
+
+```yaml
+freigegeben_bis: intern   # id der höchsten Stufe, die ohne Warnung durchgeht
+schwelle: 0.3             # optional; eine Stufe zählt ab dieser Wahrscheinlichkeit
+stufen:                   # von niedrig nach hoch, die Reihenfolge ist die Rangfolge
+  - id: oeffentlich
+    name: Öffentlich
+    laya: Veröffentlichte Information wie Pressemitteilung, Webseite oder Gesetzestext
+    text: |
+      **Definition:** …
+      **KI-Nutzung:** …
+  - id: intern
+    …
+zugangsdaten:             # optional
+  text: Passwörter, Tokens und API-Keys dürfen nie in ein KI-System.
+```
+
+- `id`, `name`, `laya` und `text` sind je Stufe Pflicht, die `id` muss eindeutig sein. Es braucht
+  mindestens zwei Stufen, und auch die unterste definiert die Installation selbst.
+- `laya` ist die Kurzbeschreibung, nach der das Modell die Stufe wählt: ein bis zwei Zeilen mit
+  konkreten Beispielen. Sie bleibt auf dem Server, `/api/config` liefert sie nicht aus.
+- `text` ist Markdown für die Anzeige, etwa Definition und Regel für die KI-Nutzung.
+- `zugangsdaten.text` erscheint bei einer Warnung wegen Zugangsdaten; fehlt er, steht dort ein
+  generischer Satz.
+
+Die App liest die Datei bei jedem Aufruf neu, eine Änderung wirkt ohne Neustart. Das Flag dagegen
+wirkt erst nach einem Neustart des Containers. `/api/health` zeigt im Feld `classification`, woran
+man ist:
+
+| Meldung | Bedeutung |
+|---|---|
+| `aus` | `CLASSIFICATION_ENABLED` ist nicht `1` |
+| `aktiv: 4 Stufen` | Flag an, Regeldatei gültig |
+| `Fehler: Regeldatei fehlt (…)` | Flag an, aber keine Datei unter dem Pfad |
+| `Fehler: Zeile 7: …` | Flag an, Datei ungültig (YAML-Fehler mit Zeile, zu wenige Stufen, doppelte `id`, unbekanntes `freigegeben_bis`) |
+
+Fehlt die Datei oder ist sie ungültig, läuft alles wie bei Flag aus, nur `/api/health` meldet den
+Fehler, damit eine vergessene Datei auffällt.
+
 ## Bedienung
 
 Die Oberfläche ist für Nutzer ohne technisches Vorwissen gedacht. Ein Klick auf „Wie funktioniert
@@ -185,6 +240,8 @@ App protokolliert, gelten dort als wesentliche Änderung und gehen vorher an den
 | `OMP_NUM_THREADS` | 4 | CPU-Threads je Container |
 | `MAX_TEXT_CHARS` | 50000 | Höchstlänge eines Textes je Anfrage, längere lehnt die App ab |
 | `NOTICE_FILE` | /opt/local/hinweise.md | Pfad im Container für die Hinweise dieser Installation im Splash-Screen; `./local` ist dorthin gemountet |
+| `CLASSIFICATION_ENABLED` | 0 | `1` schaltet die Klassifikation an (siehe Klassifikation), wirkt nach Neustart des Containers |
+| `CLASSIFICATION_FILE` | /opt/local/klassifikation.yaml | Pfad im Container für die Klassifikationsregeln dieser Installation |
 | `REQUEST_LOG` | /var/log/fidelius/requests.jsonl | Pfad im Container für das Request-Log (eine JSON-Zeile je Prüfung, ohne Text); nur unter `/var/log/fidelius` liegt es auf dem Volume `request-log` |
 
 Kategorien, Farben, Label-Zuordnungen und die Laya-Fragen stehen in `app/fidelius/config.py`.
