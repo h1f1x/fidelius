@@ -65,7 +65,6 @@ class Pipeline:
             laya_error = exc.__class__.__name__
             gate_note = f"Laya nicht erreichbar ({exc.__class__.__name__}); Gate übersprungen."
         timing.gate_ms = self._ms(t0)
-        classified = _classify_original(rules, result, laya_error) if rules else None
         sensitive = prob is None or prob >= threshold
         gate = Gate(probability=prob, threshold=threshold, sensitive=sensitive,
                     skipped=req.force, note=gate_note)
@@ -75,6 +74,8 @@ class Pipeline:
         # Zugangsdaten werden auch ersetzt, wenn das Gate den Text für harmlos hält: Ein Passwort
         # bleibt ein Passwort, egal wie wenig Personenbezug drumherum steht.
         cred_hits = detect_credentials(text) if credentials else []
+        # Für die Warnung zählt jeder ZUGANG-Treffer, auch einer, den die Kategorienwahl ausfiltert.
+        credentials_found = bool(cred_hits)
         if cred_hits and not (sensitive or req.force):
             entities = merge_hits(cred_hits, text, allowed)
         if sensitive or req.force:
@@ -84,6 +85,7 @@ class Pipeline:
             hits = [h for f in futs for h in f.result()]
             if credentials:
                 hits = [_as_credential(h) for h in hits] + cred_hits
+                credentials_found = any(h.category == config.ZUGANG for h in hits)
             # 3. Zusammenführen
             entities = merge_hits(hits, text, allowed)
             timing.detect_ms = self._ms(t1)
@@ -104,6 +106,7 @@ class Pipeline:
                         for e in entities]
         # 5. Platzhalter
         entities = assign_placeholders(entities)
+        classified = _classify_original(rules, result, laya_error, credentials_found) if rules else None
         timing.total_ms = self._ms(t0)
         res = AnalyzeResponse(
             text=text, gate=gate, entities=entities,
@@ -130,12 +133,19 @@ def _as_credential(h: RawHit) -> RawHit:
 
 
 def _classify_original(rules: classification.Rules, result: GateResult | None,
-                       laya_error: str | None) -> Classification:
-    """Stufe des Originals aus dem Gate-Batch; ohne Laya-Antwort nur ein Hinweis."""
+                       laya_error: str | None, credentials: bool) -> Classification:
+    """Stufe des Originals aus dem Gate-Batch; ohne Laya-Antwort nur ein Hinweis.
+
+    Zugangsdaten stehen im Original, wenn ein ZUGANG-Treffer gefunden wurde (`credentials`)
+    oder Laya sie in einem Abschnitt sieht.
+    """
     if result is None:
         return classification.summarize(
-            rules, None, note=f"Laya nicht erreichbar ({laya_error}); keine Schutzstufe.")
-    return classification.summarize(rules, classification.assess(rules, result.sections))
+            rules, None, credentials=credentials,
+            note=f"Laya nicht erreichbar ({laya_error}); keine Schutzstufe.")
+    original = classification.assess(rules, result.sections)
+    credentials = credentials or classification.credentials_likely(original)
+    return classification.summarize(rules, original, credentials=credentials)
 
 
 def _log_entry(req: AnalyzeRequest, res: AnalyzeResponse, source: Source,

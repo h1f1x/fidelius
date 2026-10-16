@@ -129,6 +129,10 @@ def test_level_questions_run_in_the_single_gate_batch(enabled):
         "instructions": "Welcher Schutzstufe gehört dieser Text an?",
         "criteria": {"oeffentlich": "Veröffentlichte Information", "intern": "Interne Arbeitsunterlage",
                      "vertraulich": "Geschäftsgeheimnis"},
+    }, "zugang": {
+        "type": "noul",
+        "instructions": "Enthält dieser Text ein Passwort, einen Token, einen API-Key, "
+                        "einen privaten Schlüssel oder andere Zugangsdaten?",
     }}]
 
 
