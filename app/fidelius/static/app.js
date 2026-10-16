@@ -226,7 +226,9 @@
   function render() {
     renderGate(); renderResult(); renderMapping(); renderElapsed();
     const t = state.timing;
-    $("timing").textContent = t ? `Einschätzung ${t.gate_ms} ms · Erkennung ${t.detect_ms} ms · Laya-Bestätigung ${t.laya_check_ms} ms · gesamt ${t.total_ms} ms\n${calibrationText(CONFIG.calibration)}` : "";
+    // Die Schutzstufe des Originals steckt in der Einschätzung, die des anonymisierten Texts ist ein eigener Durchlauf.
+    const classMs = t && state.classification ? ` · Schutzstufe anonymisiert ${t.classification_ms} ms` : "";
+    $("timing").textContent = t ? `Einschätzung ${t.gate_ms} ms · Erkennung ${t.detect_ms} ms · Laya-Bestätigung ${t.laya_check_ms} ms${classMs} · gesamt ${t.total_ms} ms\n${calibrationText(CONFIG.calibration)}` : "";
     renderSteps();
   }
   function gateWord(p) {
@@ -318,7 +320,8 @@
     // Maßgeblich ist der Text, der in die KI geht: der anonymisierte, solange es keine eigene Bewertung gibt das Original.
     const rule = level((c.anonymized || c.original).level).text;
     const banner = c.warn ? `<div class="classwarn" role="alert"><strong>Die Schutzstufe liegt über der Freigabe für KI-Systeme. Es gilt:</strong>${rule ? markdown(rule) : ""}</div>` : "";
-    return `<div class="classbadge">Schutzstufe: ${badge}</div>${banner}`;
+    const note = c.note ? ` <span class="muted">${esc(c.note)}</span>` : "";
+    return `<div class="classbadge">Schutzstufe: ${badge}${note}</div>${banner}`;
   }
 
   function renderMapping() {
