@@ -130,6 +130,11 @@ darüber in Warnfarbe und mit einem Banner, das den `text` der Stufe zeigt. `/ap
 dazu das Feld `classification` (Format in der Spec, Abschnitt 6); ist Laya nicht erreichbar, steht
 dort nur ein Hinweis in `note`.
 
+Korrekturen an den Treffern rufen kein Modell auf; danach steht am Badge „veraltet“. Der Button
+„neu bewerten“ schickt den aktuellen anonymisierten Text an `POST /api/classify` und ersetzt die
+Bewertung des anonymisierten Texts. Der Endpunkt antwortet bei Flag aus oder ungültiger Datei mit
+404 und schreibt nichts ins Request-Log.
+
 Die App liest die Datei bei jedem Aufruf neu, eine Änderung wirkt ohne Neustart. Das Flag dagegen
 wirkt erst nach einem Neustart des Containers. `/api/health` zeigt im Feld `classification`, woran
 man ist:
