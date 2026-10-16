@@ -56,6 +56,22 @@ def test_log_holds_both_levels_warning_and_second_pass_duration(enabled, tmp_pat
     }
 
 
+def test_unchanged_text_logs_the_original_level_for_both(enabled, tmp_path):
+    """Ohne zweiten Durchlauf gilt die Bewertung des Originals für beide (Spec 4)."""
+    line = logged(tmp_path, FakeLaya(0.1, chunks=[Chunk(stufe=VERTRAULICH)]))
+
+    assert line["stufe_original"] == line["stufe_anonymisiert"] == "vertraulich"
+
+
+def test_failing_second_pass_logs_no_anonymized_level(enabled, tmp_path):
+    laya = FakeLaya(chunks=[Chunk(stufe=VERTRAULICH)], ask_reachable=False)
+
+    line = logged(tmp_path, laya, PERSON_TEXT, detectors=[person_detector])
+
+    assert line["stufe_original"] == "vertraulich"
+    assert line["stufe_anonymisiert"] is None
+
+
 def test_without_flag_the_fields_are_missing(rules_file, tmp_path):
     line = logged(tmp_path, FakeLaya(0.1))
 
@@ -95,8 +111,8 @@ def test_report_counts_only_entries_with_classification(rules_file, tmp_path):
               entry(),  # älterer Eintrag oder Flag aus
               classified("vertraulich", "oeffentlich", warned=True),
               classified("vertraulich", "intern", warned=True, credentials=True),
-              classified("intern", "intern"),
-              classified("oeffentlich"),
+              classified("intern", "intern"),  # auch: Text unverändert
+              classified("oeffentlich"),  # zweiter Durchlauf fehlgeschlagen
               classified(None))  # Laya nicht erreichbar
 
     c = report(path, "30d", now=NOW, rules=load_rules(rules_file))["classification"]

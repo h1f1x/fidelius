@@ -143,7 +143,7 @@ soweit nicht anders angegeben.
 | Aussage | Beleg |
 |---|---|
 | Nutzungsprotokoll ohne Text, Treffer und Netzadresse | `app/fidelius/pipeline.py`, `_log_entry`; Felder: `zeit`, `build`, `quelle`, `zeichen`, `gate_wert`, `schwelle`, `sensibel`, `trotzdem`, `laya_bestaetigung`, `gate_ms`, `erkennung_ms`, `laya_ms`, `gesamt_ms`, `stellen`, `platzhalter`, `laya_abgelehnt`, `fehler` |
-| Zusätzliche Felder nur bei aktiver Klassifikation | `app/fidelius/pipeline.py`, `_classification_fields`: `stufe_original`, `stufe_anonymisiert` (id der Stufe, `null` ohne Einschätzung), `zugangsdaten`, `gewarnt`, `klassifikation_ms`; Stufen und Freigabe aus `local/klassifikation.yaml` der Installation |
+| Zusätzliche Felder nur bei aktiver Klassifikation | `app/fidelius/pipeline.py`, `_classification_fields`: `stufe_original`, `stufe_anonymisiert` (id der Stufe, bei unverändertem Text die des Originals, `null` nur ohne Einschätzung durch Laya), `zugangsdaten`, `gewarnt`, `klassifikation_ms`; Stufen und Freigabe aus `local/klassifikation.yaml` der Installation |
 | Feldliste festgeschrieben | `app/tests/test_pipeline.py`, Vergleich mit der vollständigen Feldmenge; mit Klassifikation `app/tests/test_classification_log.py` |
 | Kein Protokoll der Seitenaufrufe | `app/Dockerfile`: uvicorn mit `--no-access-log` |
 | Technische Meldungen begrenzt | `compose.yaml`: `x-logging`, json-file mit `max-size: 10m`, `max-file: 3` |

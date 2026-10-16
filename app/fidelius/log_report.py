@@ -40,6 +40,7 @@ Antwort von report() bzw. GET /api/report?period=24h|7d|30d|all (Standard 30d):
                     stufe_original im Eintrag (Klassifikation an); levels in der Reihenfolge der
                     aktiven Regeln (report(..., rules=)), ohne Regeln in der des Auftauchens und
                     lowered = null; lowered_share bezogen auf Anfragen mit beiden Stufen
+                    (bei unverändertem Text sind beide gleich, null nur bei Laya-Fehler)
 
 GET /api/request-log liefert die Rohdatei als application/x-ndjson, 404 wenn sie fehlt.
 """

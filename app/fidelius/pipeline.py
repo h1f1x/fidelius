@@ -197,17 +197,23 @@ def _log_entry(req: AnalyzeRequest, res: AnalyzeResponse, source: Source,
         "fehler": res.gate.note,
     }
     if res.classification:
-        entry.update(_classification_fields(res.classification, res.timing.classification_ms))
+        entry.update(_classification_fields(res))
     return entry
 
 
-def _classification_fields(c: Classification, classification_ms: int) -> dict:
+def _classification_fields(res: AnalyzeResponse) -> dict:
     """Nur die Stufen-ids und Schalter; Abschnitte und Wahrscheinlichkeiten bleiben draußen.
     Fehlen die Felder, war die Klassifikation aus (Spec klassifikation.md, Abschnitt 8)."""
+    c = res.classification
+    original = c.original.level if c.original else None
+    # Unveränderter Text bekommt keinen zweiten Durchlauf, die Stufe des Originals gilt für
+    # beide (Spec 4). Ohne Stufe bleibt der anonymisierte Text also nur bei einem Laya-Fehler.
+    unchanged = res.anonymized_text == res.text
+    anonymized = original if unchanged else (c.anonymized.level if c.anonymized else None)
     return {
-        "stufe_original": c.original.level if c.original else None,
-        "stufe_anonymisiert": c.anonymized.level if c.anonymized else None,
+        "stufe_original": original,
+        "stufe_anonymisiert": anonymized,
         "zugangsdaten": c.credentials,
         "gewarnt": c.warn,
-        "klassifikation_ms": classification_ms,
+        "klassifikation_ms": res.timing.classification_ms,
     }
