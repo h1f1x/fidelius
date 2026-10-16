@@ -14,7 +14,8 @@ from fastapi.staticfiles import StaticFiles
 from . import build_info, classification, config, log_report
 from .calibration import Calibration
 from .detectors import gliner, spacy_det
-from .models import AnalyzeRequest, AnalyzeResponse, ApplyRequest, ApplyResponse
+from .models import (AnalyzeRequest, AnalyzeResponse, ApplyRequest, ApplyResponse, ClassifyRequest,
+                     TextLevel)
 from .pipeline import LOAD_TEST, REQUEST, Pipeline
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -152,6 +153,25 @@ def apply(req: ApplyRequest) -> ApplyResponse:
         raise HTTPException(413, f"Zu viele Stellen ({len(req.entities)}, höchstens {config.MAX_ENTITIES})")
     entities, anonymized, mapping = pipeline.apply(req.text, req.entities)
     return ApplyResponse(entities=entities, anonymized_text=anonymized, mapping=mapping)
+
+
+@app.post("/api/classify", response_model=TextLevel)
+def classify(req: ClassifyRequest) -> TextLevel:
+    """Schutzstufe eines Texts, für „neu bewerten“ nach Korrekturen (Spec Klassifikation, Abschnitt 6).
+
+    Fragt Laya nur nach der Klassifikation, ohne Gate und ohne Eintrag im Request-Log.
+    """
+    rules, _ = classification.active_rules()
+    if rules is None:
+        raise HTTPException(404, "Klassifikation ist nicht aktiv")
+    if not req.text.strip():
+        raise HTTPException(400, "Leerer Text")
+    _check_length(req.text)
+    try:
+        sections = pipeline.laya.ask(req.text, classification.questions(rules))
+    except Exception as exc:  # noqa: BLE001 - jede Laya-Störung heißt: keine neue Bewertung
+        raise HTTPException(503, f"Laya nicht erreichbar ({exc.__class__.__name__})") from exc
+    return classification.assess(rules, sections)
 
 
 @app.get("/api/report")
