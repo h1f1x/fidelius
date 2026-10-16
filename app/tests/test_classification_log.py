@@ -70,6 +70,8 @@ def test_failing_second_pass_logs_no_anonymized_level(enabled, tmp_path):
 
     assert line["stufe_original"] == "vertraulich"
     assert line["stufe_anonymisiert"] is None
+    assert line["fehler"] == ("Laya nicht erreichbar (TimeoutError); "
+                              "keine Schutzstufe für den anonymisierten Text.")
 
 
 def test_without_flag_the_fields_are_missing(rules_file, tmp_path):
@@ -84,6 +86,8 @@ def test_unreachable_laya_logs_no_level(enabled, tmp_path):
     assert line["stufe_original"] is None
     assert line["stufe_anonymisiert"] is None
     assert line["gewarnt"] is False
+    # Der Ausfall steht einmal im Log, nicht zusätzlich als Hinweis der Klassifikation.
+    assert line["fehler"] == "Laya nicht erreichbar (ConnectionError); Gate übersprungen."
 
 
 def test_log_has_neither_text_nor_probabilities_nor_section_bounds(enabled, tmp_path):

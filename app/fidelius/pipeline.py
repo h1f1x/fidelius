@@ -194,11 +194,21 @@ def _log_entry(req: AnalyzeRequest, res: AnalyzeResponse, source: Source,
         "stellen": sum(e.placeholder is not None for e in res.entities),
         "platzhalter": len(res.mapping),
         "laya_abgelehnt": laya_rejected,
-        "fehler": res.gate.note,
+        "fehler": _error(res),
     }
     if res.classification:
         entry.update(_classification_fields(res))
     return entry
+
+
+def _error(res: AnalyzeResponse) -> str | None:
+    """Störungen der Anfrage: Gate und Bestätigung aus gate.note, dazu ein Ausfall im zweiten
+    Durchlauf der Klassifikation (Spec 4). Fiel schon das Gate aus, steht nur dieser Hinweis da."""
+    c = res.classification
+    second_pass = c.note if c and c.original else None
+    if second_pass is None:
+        return res.gate.note
+    return f"{res.gate.note} {second_pass}" if res.gate.note else second_pass
 
 
 def _classification_fields(res: AnalyzeResponse) -> dict:
