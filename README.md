@@ -144,7 +144,7 @@ man ist:
 | `aus` | `CLASSIFICATION_ENABLED` ist nicht `1` |
 | `aktiv: 4 Stufen` | Flag an, Regeldatei gültig |
 | `Fehler: Regeldatei fehlt (…)` | Flag an, aber keine Datei unter dem Pfad |
-| `Fehler: Zeile 7: …` | Flag an, Datei ungültig (YAML-Fehler mit Zeile, zu wenige Stufen, doppelte `id`, unbekanntes `freigegeben_bis`) |
+| `Fehler: Zeile 7: …` | Flag an, Datei ungültig (YAML-Fehler, zu wenige Stufen, Stufe ohne Pflichtfeld, doppelte `id`, unbekanntes `freigegeben_bis`, `schwelle` außerhalb 0 bis 1); die Zeile zeigt auf die Stelle |
 
 Fehlt die Datei oder ist sie ungültig, läuft alles wie bei Flag aus, nur `/api/health` meldet den
 Fehler, damit eine vergessene Datei auffällt.

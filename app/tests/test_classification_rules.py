@@ -56,6 +56,25 @@ def test_invalid_rules_raise_with_reason(tmp_path, content, message):
         classification.load_rules(_write(tmp_path, content))
 
 
+@pytest.mark.parametrize("content, line", [
+    (RULES.replace("freigegeben_bis: intern", "freigegeben_bis: geheim"), 1),
+    (RULES.replace("schwelle: 0.3", "schwelle: 2"), 2),
+    (RULES.split("  - id: intern")[0], 3),  # zu wenige Stufen: Zeile von stufen
+    (RULES.replace("    laya: Interne Arbeitsunterlage\n", ""), 8),  # Stufe ohne laya
+    (RULES.replace("id: vertraulich", "id: intern"), 12),  # doppelte id
+], ids=["freigegeben_bis", "schwelle", "zu-wenige-stufen", "ohne-laya", "doppelte-id"])
+def test_semantic_errors_name_the_line(tmp_path, content, line):
+    with pytest.raises(classification.RulesError, match=rf"^Zeile {line}: "):
+        classification.load_rules(_write(tmp_path, content))
+
+
+def test_health_names_the_line_of_a_duplicate_id(client, enabled, monkeypatch, tmp_path):
+    path = _write(tmp_path, RULES.replace("id: vertraulich", "id: intern"))
+    monkeypatch.setattr(config, "CLASSIFICATION_FILE", path)
+    assert client.get("/api/health").json()["classification"] == \
+        "Fehler: Zeile 12: Stufe 3: id intern ist doppelt"
+
+
 def test_example_file_in_repo_is_valid():
     rules = classification.load_rules(str(EXAMPLE))
     assert len(rules.levels) == 4

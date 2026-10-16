@@ -54,36 +54,66 @@ def load_rules(path: str) -> Rules:
         raise RulesError(f"Regeldatei nicht lesbar ({path}): {exc}") from None
     try:
         data = yaml.safe_load(raw)
+        root = yaml.compose(raw, Loader=yaml.SafeLoader)
     except yaml.YAMLError as exc:
         mark = getattr(exc, "problem_mark", None)
         where = f"Zeile {mark.line + 1}: " if mark else ""
         raise RulesError(f"{where}{getattr(exc, 'problem', None) or exc}") from None
-    return _parse(data)
+    return _parse(data, _Lines(root))
 
 
-def _parse(data: object) -> Rules:
+class _Lines:
+    """Zeilennummern zur Regeldatei aus dem YAML-Knotenbaum, damit auch inhaltliche Fehler wie
+    eine doppelte id die Stelle nennen."""
+
+    def __init__(self, root: yaml.Node | None):
+        self.root = root
+
+    def error(self, msg: str, *path: str | int) -> RulesError:
+        """Fehler an der Stelle `path` (Schlüssel und Listenindex); fehlt sie, am nächsten
+        vorhandenen Knoten darüber."""
+        node, line = self.root, None
+        if node is not None:
+            line = node.start_mark.line
+        for key in path:
+            if isinstance(node, yaml.MappingNode):
+                pair = next(((k, v) for k, v in node.value if k.value == key), None)
+                if pair is None:
+                    break
+                line, node = pair[0].start_mark.line, pair[1]
+            elif isinstance(node, yaml.SequenceNode) and isinstance(key, int) and key < len(node.value):
+                node = node.value[key]
+                line = node.start_mark.line
+            else:
+                break
+        return RulesError(msg if line is None else f"Zeile {line + 1}: {msg}")
+
+
+def _parse(data: object, lines: _Lines) -> Rules:
     if not isinstance(data, dict):
-        raise RulesError("Die Regeldatei muss eine Zuordnung mit stufen und freigegeben_bis sein")
+        raise lines.error("Die Regeldatei muss eine Zuordnung mit stufen und freigegeben_bis sein")
     raw_levels = data.get("stufen")
     if not isinstance(raw_levels, list) or len(raw_levels) < 2:
-        raise RulesError("stufen braucht mindestens zwei Einträge")
+        raise lines.error("stufen braucht mindestens zwei Einträge", "stufen")
     levels: list[Level] = []
     for n, item in enumerate(raw_levels, 1):
         if not isinstance(item, dict):
-            raise RulesError(f"Stufe {n} ist keine Zuordnung")
+            raise lines.error(f"Stufe {n} ist keine Zuordnung", "stufen", n - 1)
         missing = [k for k in ("id", "name", "laya", "text") if not str(item.get(k) or "").strip()]
         if missing:
-            raise RulesError(f"Stufe {n} ({item.get('id', '?')}): es fehlt {', '.join(missing)}")
+            raise lines.error(f"Stufe {n} ({item.get('id', '?')}): es fehlt {', '.join(missing)}",
+                              "stufen", n - 1)
         lv = Level(*(str(item[k]).strip() for k in ("id", "name", "laya", "text")))
         if any(o.id == lv.id for o in levels):
-            raise RulesError(f"Stufe {n}: id {lv.id} ist doppelt")
+            raise lines.error(f"Stufe {n}: id {lv.id} ist doppelt", "stufen", n - 1, "id")
         levels.append(lv)
     approved = str(data.get("freigegeben_bis") or "")
     if approved not in {lv.id for lv in levels}:
-        raise RulesError(f"freigegeben_bis: {approved or '(leer)'} ist keine id aus stufen")
+        raise lines.error(f"freigegeben_bis: {approved or '(leer)'} ist keine id aus stufen",
+                          "freigegeben_bis")
     threshold = data.get("schwelle", DEFAULT_THRESHOLD)
     if not isinstance(threshold, (int, float)) or not 0 < threshold <= 1:
-        raise RulesError(f"schwelle muss zwischen 0 und 1 liegen, nicht {threshold}")
+        raise lines.error(f"schwelle muss zwischen 0 und 1 liegen, nicht {threshold}", "schwelle")
     creds = data.get("zugangsdaten") or {}
     creds_text = str(creds.get("text") or "").strip() if isinstance(creds, dict) else ""
     return Rules(tuple(levels), approved, float(threshold), creds_text or None)
