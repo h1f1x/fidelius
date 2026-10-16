@@ -158,7 +158,8 @@ def apply(req: ApplyRequest) -> ApplyResponse:
 def get_report(period: str = "30d") -> dict:
     """Fehlt das Log, kommt trotzdem eine Antwort mit log.present = false und dem Pfad."""
     try:
-        return log_report.report(config.REQUEST_LOG, period)
+        rules, _ = classification.active_rules()  # Reihenfolge und Namen der Stufen
+        return log_report.report(config.REQUEST_LOG, period, rules=rules)
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
 

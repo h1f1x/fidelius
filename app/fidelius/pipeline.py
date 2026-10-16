@@ -174,7 +174,7 @@ def _classify_original(rules: classification.Rules, result: GateResult | None,
 def _log_entry(req: AnalyzeRequest, res: AnalyzeResponse, source: Source,
                laya_rejected: int) -> dict:
     """Nur Zahlen und Schalter: Text, Treffer und Platzhalter verlassen die Anfrage nie."""
-    return {
+    entry = {
         "zeit": datetime.now(UTC).isoformat(timespec="seconds"),
         "build": build_info.build(),
         "quelle": source,
@@ -192,4 +192,19 @@ def _log_entry(req: AnalyzeRequest, res: AnalyzeResponse, source: Source,
         "platzhalter": len(res.mapping),
         "laya_abgelehnt": laya_rejected,
         "fehler": res.gate.note,
+    }
+    if res.classification:
+        entry.update(_classification_fields(res.classification, res.timing.classification_ms))
+    return entry
+
+
+def _classification_fields(c: Classification, classification_ms: int) -> dict:
+    """Nur die Stufen-ids und Schalter; Abschnitte und Wahrscheinlichkeiten bleiben draußen.
+    Fehlen die Felder, war die Klassifikation aus (Spec klassifikation.md, Abschnitt 8)."""
+    return {
+        "stufe_original": c.original.level if c.original else None,
+        "stufe_anonymisiert": c.anonymized.level if c.anonymized else None,
+        "zugangsdaten": c.credentials,
+        "gewarnt": c.warn,
+        "klassifikation_ms": classification_ms,
     }

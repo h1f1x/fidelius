@@ -35,6 +35,11 @@ Antwort von report() bzw. GET /api/report?period=24h|7d|30d|all (Standard 30d):
                     (0.2 = 20 % langsamer, negativ = schneller)
     calibration     {texts: [Zeichenzahlen], rows: [{build, runs, median_ms: [je Text]}]}
     errors          [{text, count, last}], häufigste zuerst
+    classification  {requests, levels: [{level, name, original, anonymized}], no_level, lowered,
+                     lowered_share, warned, warned_share, credentials}; zählt nur Anfragen mit
+                    stufe_original im Eintrag (Klassifikation an); levels in der Reihenfolge der
+                    aktiven Regeln (report(..., rules=)), ohne Regeln in der des Auftauchens und
+                    lowered = null; lowered_share bezogen auf Anfragen mit beiden Stufen
 
 GET /api/request-log liefert die Rohdatei als application/x-ndjson, 404 wenn sie fehlt.
 """
@@ -45,6 +50,7 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
+from .classification import Rules
 from .pipeline import CALIBRATION, REQUEST
 
 # Das Log bleibt in UTC; Tage und Stunden zählen so, wie die Nutzer sie erleben.
@@ -60,7 +66,8 @@ LENGTH_CLASSES = [("≤ 1 Seite", PAGE_CHARS), ("1–3 Seiten", 3 * PAGE_CHARS),
                   ("> 15 Seiten", None)]
 
 
-def report(path: str | Path, period: str, now: datetime | None = None) -> dict:
+def report(path: str | Path, period: str, now: datetime | None = None,
+           rules: Rules | None = None) -> dict:
     if period not in PERIODS:
         raise ValueError(f"Unbekannter Zeitraum {period!r}, erlaubt: {', '.join(PERIODS)}")
     path = Path(path)
@@ -87,6 +94,7 @@ def report(path: str | Path, period: str, now: datetime | None = None) -> dict:
         "builds": _builds(in_period, entries),
         "calibration": _calibration(in_period),
         "errors": _errors(requests),
+        "classification": _classification(requests, rules),
     }
 
 
@@ -319,6 +327,46 @@ def _errors(requests: list[dict]) -> list[dict]:
     rows = [{"text": text, "count": len(times), "last": _berlin(max(times))}
             for text, times in groups.items()]
     return sorted(rows, key=lambda row: (-row["count"], row["text"]))
+
+
+# ---------- classification ----------
+
+def _classification(requests: list[dict], rules: Rules | None) -> dict:
+    """Zählt nur Einträge mit Klassifikation; ältere oder mit Flag aus haben das Feld nicht.
+
+    Reihenfolge und Namen der Stufen kommen aus den aktiven Regeln, denn das Log kennt nur ids.
+    Ohne Regeln stehen die ids in der Reihenfolge ihres Auftauchens, und ob die Anonymisierung
+    eine Stufe gesenkt hat, ist nicht bestimmbar (lowered = null). Eine id, die die Regeln nicht
+    mehr kennen, steht am Ende und zählt nie als gesenkt."""
+    rows = [e for e in requests if "stufe_original" in e]
+    names = {lv.id: lv.name for lv in rules.levels} if rules else {}
+    order = list(names)
+    for e in rows:
+        for key in ("stufe_original", "stufe_anonymisiert"):
+            if isinstance(e.get(key), str) and e[key] not in order:
+                order.append(e[key])
+    levels = [{"level": lv, "name": names.get(lv, lv),
+               "original": sum(e["stufe_original"] == lv for e in rows),
+               "anonymized": sum(e.get("stufe_anonymisiert") == lv for e in rows)}
+              for lv in order]
+    both = [e for e in rows
+            if isinstance(e["stufe_original"], str) and isinstance(e.get("stufe_anonymisiert"), str)]
+    lowered = None
+    if rules:
+        rank = {lv: i for i, lv in enumerate(names)}
+        lowered = sum(e["stufe_original"] in rank and e["stufe_anonymisiert"] in rank
+                      and rank[e["stufe_anonymisiert"]] < rank[e["stufe_original"]] for e in both)
+    warned = sum(bool(e.get("gewarnt")) for e in rows)
+    return {
+        "requests": len(rows),
+        "levels": levels,
+        "no_level": sum(not isinstance(e["stufe_original"], str) for e in rows),
+        "lowered": lowered,
+        "lowered_share": None if lowered is None else _share(lowered, len(both)),
+        "warned": warned,
+        "warned_share": _share(warned, len(rows)),
+        "credentials": sum(bool(e.get("zugangsdaten")) for e in rows),
+    }
 
 
 # ---------- Hilfen ----------
