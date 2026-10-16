@@ -1,6 +1,6 @@
 # Spec: Klassifikation nach Schutzstufen
 
-Stand: 2026-10-15, Ergebnis einer Klärungsrunde. Alle Punkte sind entschieden, umgesetzt ist noch nichts. Entscheidung: [ADR-0001](../adr/0001-klassifikation-warnt-je-installation.md). Issue: noch nicht angelegt.
+Stand: 2026-10-16. Alle Punkte sind entschieden und umgesetzt (#8–#16), Abweichungen stehen in den Abschnitten. Offen ist die Messung der Treffsicherheit (#17, Abschnitt 9). Entscheidung: [ADR-0001](../adr/0001-klassifikation-warnt-je-installation.md). Issue: [#7](https://github.com/h1f1x/fidelius/issues/7).
 
 ## Ziel
 
@@ -106,15 +106,15 @@ zugangsdaten:
 
 Alles in diesem Abschnitt gilt nur bei Flag an und gültiger Regeldatei.
 
-- Neue Kategorie `ZUGANG` in `config.CATEGORIES` mit eigener Farbe, Platzhalter `[ZUGANG_1]`.
+- Neue Kategorie `ZUGANG` mit eigener Farbe, Platzhalter `[ZUGANG_1]`. Umgesetzt steht sie nicht fest in `config.CATEGORIES`, sondern `classification.categories(rules)` fügt sie nur bei aktiven Regeln hinzu. So ist sie bei Flag aus oder ungültiger Datei auch in `/api/config` und der Kategorienwahl nicht da.
 - Neue Regex-Muster im Regex-Erkenner, alle in RE2-Syntax:
   - privater Schlüssel im PEM-Format (`-----BEGIN … PRIVATE KEY-----` bis zum passenden END)
   - bekannte Token-Präfixe: `sk-`, `sk-ant-`, `ghp_`, `gho_`, `github_pat_`, `xoxb-`, `xoxp-`, `AKIA` mit 16 Zeichen, `glpat-`
   - JWT (`eyJ…\.eyJ…\.…`)
-  - Schlüsselwort plus Wert: `passwort`, `password`, `pwd`, `kennwort`, `token`, `api_key`, `apikey`, `secret`, `client_secret`, gefolgt von `:` oder `=` und einem Wert ohne Leerzeichen
+  - Schlüsselwort plus Wert: `passwort`, `password`, `passwd`, `pwd`, `kennwort`, `token`, `api_key`, `apikey`, `secret`, `client_secret`, gefolgt von `:` oder `=` und einem Wert ohne Leerzeichen. Ein Präfix wie in `DB_PASSWORD` oder `app-secret` gehört zum Schlüsselwort. Ersetzt wird nur der Wert, und nur, wenn er eine Ziffer oder ein Sonderzeichen enthält: „Das Passwort: bekommst du per Telefon“ ist Fließtext. Ein Wert nur aus Buchstaben fängt allein die Laya-Frage `zugang` (entschieden bei der Umsetzung).
 - GLiNER-Labels `password`, `secret` und `api_key` zeigen künftig auf `ZUGANG` statt auf `KENNUNG`.
 - Regex-Treffer für ZUGANG fragt Laya nicht nach, wie alle Regex-Treffer. GLiNER-Treffer für ZUGANG werden nicht bestätigt, weil `NICHT_SENSIBEL` ein Passwort wie „Sommer2026!“ zu leicht ablehnt: ZUGANG kommt nicht in `LAYA_CHECKED_CATEGORIES`.
-- Die Warnung bleibt auch dann stehen, wenn alle Zugangsdaten ersetzt sind: „Im Original stehen Zugangsdaten. Sie sind ersetzt, sollten aber als offengelegt gelten und ausgetauscht werden.“ Ein Secret, das einmal in einer Zwischenablage lag, gilt als kompromittiert.
+- Die Warnung bleibt auch dann stehen, wenn alle Zugangsdaten ersetzt sind: „Im Original stehen Zugangsdaten. Auch wenn sie ersetzt sind, sollten sie als offengelegt gelten und ausgetauscht werden.“ Ein Secret, das einmal in einer Zwischenablage lag, gilt als kompromittiert. Der Wortlaut sagt nicht „Sie sind ersetzt“, weil das nicht immer stimmt: Bei abgewählter Kategorie ZUGANG oder wenn nur die Laya-Frage `zugang` angeschlagen hat, steht das Secret noch im Text.
 
 ## 6. Schnittstelle
 
@@ -136,7 +136,7 @@ Alles in diesem Abschnitt gilt nur bei Flag an und gültiger Regeldatei.
 - **`POST /api/classify`** mit `{"text": "…"}` liefert ein einzelnes Objekt wie `original` oben. Die UI ruft es für „neu bewerten“ mit dem aktuellen anonymisierten Text auf. Es gelten dieselben Grenzen wie bei `/api/analyze` (Textlänge, Body).
 - **`/api/apply`** bleibt ohne Modellaufruf.
 - **`/api/config`** liefert `classification` mit `levels` (`id`, `name`, `text`), `freigegeben_bis`, `schwelle` (für die Expertenansicht) und `zugangsdaten_text`, ohne die `laya`-Kurzfassungen. Bei Flag aus, fehlender oder ungültiger Datei: `null`.
-- **`/api/classify`** antwortet bei Flag aus oder ohne gültige Regeldatei mit 404.
+- **`/api/classify`** antwortet bei Flag aus oder ohne gültige Regeldatei mit 404, bei leerem Text mit 400 wie `/api/analyze`. Ist Laya nicht erreichbar, antwortet es mit 503 und „Laya nicht erreichbar (…)“, denn ohne Laya gibt es keine neue Bewertung; die UI lässt die alte dann als veraltet stehen.
 - **`/api/health`** liefert `classification`: `"aus"` (Flag aus), `"aktiv: 4 Stufen"` oder `"Fehler: <Meldung mit Zeile>"` (Flag an, Datei fehlt oder ist ungültig).
 
 ## 7. UI
