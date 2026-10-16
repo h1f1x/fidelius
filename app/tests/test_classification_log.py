@@ -8,14 +8,20 @@ from fastapi.testclient import TestClient
 
 from fidelius import config
 from fidelius.classification import load_rules
+from fidelius.detectors.base import RawHit
 from fidelius.log_report import report
 from fidelius.main import app
 from fidelius.models import AnalyzeRequest
 from fidelius.pipeline import Pipeline
-from tests.test_classification_analyze import (  # noqa: F401  (Fixtures)
-    PERSON_TEXT, TEXT, VERTRAULICH, ClassifyingLaya, Clock, enabled, person_detector, rules_file,
-)
-from tests.test_log_report import NOW, entry, write_log
+
+from .conftest import NOW, VERTRAULICH, Chunk, FakeClock, FakeLaya, entry, write_log
+
+TEXT = "Die Kantine bietet ab Montag ein neues Menü an."
+PERSON_TEXT = "Herr Emre Yilmaz hat einen Termin in der Kardiologie."
+
+
+def person_detector(text: str) -> list[RawHit]:
+    return [RawHit(5, 16, "Emre Yilmaz", "PERSON", "gliner", "person", 0.9)]
 
 CLASSIFICATION_FIELDS = {"stufe_original", "stufe_anonymisiert", "zugangsdaten", "gewarnt",
                          "klassifikation_ms"}
@@ -33,14 +39,14 @@ def logged(tmp_path, laya, text=TEXT, detectors=(), clock=lambda: 0.0) -> dict:
 
 
 def test_log_holds_both_levels_warning_and_second_pass_duration(enabled, tmp_path):
-    clock = Clock()
+    clock = FakeClock()
 
-    class SlowLaya(ClassifyingLaya):
+    class SlowLaya(FakeLaya):
         def ask(self, text, questions):
             clock.now += 0.25
             return super().ask(text, questions)
 
-    laya = SlowLaya((0, len(PERSON_TEXT), VERTRAULICH), gate_probability=0.9)
+    laya = SlowLaya(chunks=[Chunk(stufe=VERTRAULICH)])
 
     line = logged(tmp_path, laya, PERSON_TEXT, detectors=[person_detector], clock=clock)
 
@@ -51,13 +57,13 @@ def test_log_holds_both_levels_warning_and_second_pass_duration(enabled, tmp_pat
 
 
 def test_without_flag_the_fields_are_missing(rules_file, tmp_path):
-    line = logged(tmp_path, ClassifyingLaya())
+    line = logged(tmp_path, FakeLaya(0.1))
 
     assert not CLASSIFICATION_FIELDS & set(line)
 
 
 def test_unreachable_laya_logs_no_level(enabled, tmp_path):
-    line = logged(tmp_path, ClassifyingLaya(reachable=False))
+    line = logged(tmp_path, FakeLaya(0.1, reachable=False))
 
     assert line["stufe_original"] is None
     assert line["stufe_anonymisiert"] is None
@@ -65,7 +71,7 @@ def test_unreachable_laya_logs_no_level(enabled, tmp_path):
 
 
 def test_log_has_neither_text_nor_probabilities_nor_section_bounds(enabled, tmp_path):
-    laya = ClassifyingLaya((0, len(PERSON_TEXT), VERTRAULICH), gate_probability=0.9)
+    laya = FakeLaya(chunks=[Chunk(stufe=VERTRAULICH)])
 
     line = logged(tmp_path, laya, PERSON_TEXT, detectors=[person_detector])
 

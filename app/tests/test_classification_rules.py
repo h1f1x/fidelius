@@ -9,28 +9,9 @@ from fastapi.testclient import TestClient
 from fidelius import classification, config
 from fidelius.main import app
 
+from .conftest import RULES
+
 EXAMPLE = Path(__file__).resolve().parents[2] / "klassifikation.example.yaml"
-
-VALID = """\
-freigegeben_bis: intern
-schwelle: 0.3
-stufen:
-  - id: oeffentlich
-    name: Öffentlich
-    laya: Veröffentlichte Information
-    text: Darf in jedes KI-System.
-  - id: intern
-    name: Intern
-    laya: Interne Arbeitsunterlage
-    text: Nur in freigegebene KI-Systeme.
-  - id: vertraulich
-    name: Vertraulich
-    laya: Geschäftsgeheimnis
-    text: Nur mit Freigabe.
-zugangsdaten:
-  text: Nie in ein KI-System.
-"""
-
 
 def _write(tmp_path, content: str) -> str:
     f = tmp_path / "klassifikation.yaml"
@@ -38,13 +19,8 @@ def _write(tmp_path, content: str) -> str:
     return str(f)
 
 
-@pytest.fixture
-def enabled(monkeypatch):
-    monkeypatch.setattr(config, "CLASSIFICATION_ENABLED", True)
-
-
 def test_load_valid_rules(tmp_path):
-    rules = classification.load_rules(_write(tmp_path, VALID))
+    rules = classification.load_rules(_write(tmp_path, RULES))
     assert [lv.id for lv in rules.levels] == ["oeffentlich", "intern", "vertraulich"]
     assert rules.approved_up_to == "intern"
     assert rules.threshold == 0.3
@@ -53,14 +29,14 @@ def test_load_valid_rules(tmp_path):
 
 
 def test_threshold_and_credentials_text_are_optional(tmp_path):
-    content = VALID.replace("schwelle: 0.3\n", "").split("zugangsdaten:")[0]
+    content = RULES.replace("schwelle: 0.3\n", "").split("zugangsdaten:")[0]
     rules = classification.load_rules(_write(tmp_path, content))
     assert rules.threshold == classification.DEFAULT_THRESHOLD
     assert rules.credentials_text is None
 
 
 def test_rank_follows_order_in_file(tmp_path):
-    rules = classification.load_rules(_write(tmp_path, VALID))
+    rules = classification.load_rules(_write(tmp_path, RULES))
     assert rules.rank("oeffentlich") < rules.rank("intern") < rules.rank("vertraulich")
     assert rules.above_approval("vertraulich")
     assert not rules.above_approval("intern")
@@ -68,11 +44,11 @@ def test_rank_follows_order_in_file(tmp_path):
 
 @pytest.mark.parametrize("content, message", [
     ("stufen: [\n  - id: a\n", "Zeile"),
-    (VALID.replace("freigegeben_bis: intern", "freigegeben_bis: geheim"), "geheim"),
-    (VALID.replace("id: vertraulich", "id: intern"), "doppelt"),
-    (VALID.split("  - id: intern")[0], "mindestens zwei"),
-    (VALID.replace("    laya: Interne Arbeitsunterlage\n", ""), "laya"),
-    (VALID.replace("schwelle: 0.3", "schwelle: 2"), "schwelle"),
+    (RULES.replace("freigegeben_bis: intern", "freigegeben_bis: geheim"), "geheim"),
+    (RULES.replace("id: vertraulich", "id: intern"), "doppelt"),
+    (RULES.split("  - id: intern")[0], "mindestens zwei"),
+    (RULES.replace("    laya: Interne Arbeitsunterlage\n", ""), "laya"),
+    (RULES.replace("schwelle: 0.3", "schwelle: 2"), "schwelle"),
     ("- nur eine Liste\n", "Zuordnung"),
 ])
 def test_invalid_rules_raise_with_reason(tmp_path, content, message):
@@ -88,12 +64,12 @@ def test_example_file_in_repo_is_valid():
 
 def test_active_rules_off_without_flag(monkeypatch, tmp_path):
     monkeypatch.setattr(config, "CLASSIFICATION_ENABLED", False)
-    monkeypatch.setattr(config, "CLASSIFICATION_FILE", _write(tmp_path, VALID))
+    monkeypatch.setattr(config, "CLASSIFICATION_FILE", _write(tmp_path, RULES))
     assert classification.active_rules() == (None, "aus")
 
 
 def test_active_rules_with_flag_and_valid_file(enabled, monkeypatch, tmp_path):
-    monkeypatch.setattr(config, "CLASSIFICATION_FILE", _write(tmp_path, VALID))
+    monkeypatch.setattr(config, "CLASSIFICATION_FILE", _write(tmp_path, RULES))
     rules, status = classification.active_rules()
     assert rules is not None
     assert status == "aktiv: 3 Stufen"
@@ -108,10 +84,10 @@ def test_active_rules_with_flag_but_missing_file(enabled, monkeypatch, tmp_path)
 
 
 def test_rules_file_is_read_on_every_call(enabled, monkeypatch, tmp_path):
-    path = _write(tmp_path, VALID)
+    path = _write(tmp_path, RULES)
     monkeypatch.setattr(config, "CLASSIFICATION_FILE", path)
     assert classification.active_rules()[1] == "aktiv: 3 Stufen"
-    _write(tmp_path, VALID.split("  - id: vertraulich")[0])
+    _write(tmp_path, RULES.split("  - id: vertraulich")[0])
     assert classification.active_rules()[1] == "aktiv: 2 Stufen"
 
 
@@ -131,7 +107,7 @@ def client(monkeypatch):
 
 def test_health_and_config_without_flag(client, monkeypatch, tmp_path):
     monkeypatch.setattr(config, "CLASSIFICATION_ENABLED", False)
-    monkeypatch.setattr(config, "CLASSIFICATION_FILE", _write(tmp_path, VALID))
+    monkeypatch.setattr(config, "CLASSIFICATION_FILE", _write(tmp_path, RULES))
     assert client.get("/api/health").json()["classification"] == "aus"
     assert client.get("/api/config").json()["classification"] is None
 
@@ -143,7 +119,7 @@ def test_health_reports_invalid_file(client, enabled, monkeypatch, tmp_path):
 
 
 def test_config_lists_levels_without_laya_descriptions(client, enabled, monkeypatch, tmp_path):
-    monkeypatch.setattr(config, "CLASSIFICATION_FILE", _write(tmp_path, VALID))
+    monkeypatch.setattr(config, "CLASSIFICATION_FILE", _write(tmp_path, RULES))
     c = client.get("/api/config").json()["classification"]
     assert c["freigegeben_bis"] == "intern"
     assert c["zugangsdaten_text"] == "Nie in ein KI-System."
@@ -152,5 +128,5 @@ def test_config_lists_levels_without_laya_descriptions(client, enabled, monkeypa
 
 
 def test_config_reports_threshold_for_expert_view(client, enabled, monkeypatch, tmp_path):
-    monkeypatch.setattr(config, "CLASSIFICATION_FILE", _write(tmp_path, VALID))
+    monkeypatch.setattr(config, "CLASSIFICATION_FILE", _write(tmp_path, RULES))
     assert client.get("/api/config").json()["classification"]["schwelle"] == 0.3
