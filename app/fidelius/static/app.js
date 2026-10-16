@@ -207,6 +207,7 @@
     try {
       const res = await api("/api/apply", { text: state.text, entities: state.entities });
       state.entities = res.entities; state.mapping = res.mapping; state.anonymized = res.anonymized_text;
+      markClassificationStale();
       save(); render();
     } catch (e) { showError("Die Änderung konnte nicht übernommen werden: " + e.message); }
   }
@@ -303,6 +304,7 @@
       ${classificationHtml()}
       <div class="annotated-text${viewMode === "plain" ? " plain" : ""}">${empty || tokens(text, ents, viewMode)}</div>`;
     area.querySelectorAll(".seg button").forEach((b) => { b.onclick = () => { viewMode = b.dataset.view; renderResult(); }; });
+    const re = $("reclassify"); if (re) re.onclick = reclassify;
   }
 
 
@@ -321,7 +323,37 @@
     const rule = level((c.anonymized || c.original).level).text;
     const banner = c.warn ? `<div class="classwarn" role="alert"><strong>Die Schutzstufe liegt über der Freigabe für KI-Systeme. Es gilt:</strong>${rule ? markdown(rule) : ""}</div>` : "";
     const note = c.note ? ` <span class="muted">${esc(c.note)}</span>` : "";
-    return `<div class="classbadge">Schutzstufe: ${badge}${note}</div>${banner}`;
+    const stale = c.stale ? ` <span class="stale">veraltet</span> <button id="reclassify" class="small"${reclassifying ? " disabled" : ""}>${reclassifying ? "bewerte …" : "neu bewerten"}</button>` : "";
+    return `<div class="classbadge">Schutzstufe: ${badge}${stale}${note}</div>${banner}`;
+  }
+
+  // Eine Korrektur ändert den anonymisierten Text, ruft aber kein Modell auf. Die Bewertung bleibt stehen,
+  // gilt aber für den alten Text: Ihre Abschnitte (anonymized.chunk/chunks) passen nicht mehr zu
+  // state.anonymized, bis „neu bewerten“ sie ersetzt. Ohne Bewertung des Originals gibt es nichts zu ersetzen.
+  function markClassificationStale() {
+    const c = state.classification;
+    if (c && c.original && CONFIG.classification) c.stale = true;
+  }
+
+  // Ersetzt nur die Bewertung des anonymisierten Texts; das Original ist von Korrekturen unberührt.
+  // Der Ladezustand steht nicht in state, sonst bliebe der Button nach einem Neuladen gesperrt.
+  let reclassifying = false;
+  async function reclassify() {
+    const c = state.classification, rules = CONFIG.classification, text = state.anonymized;
+    if (!c || !rules) return;
+    reclassifying = true; renderResult();
+    try {
+      const anonymized = await api("/api/classify", { text });
+      // Kam während der Bewertung eine weitere Korrektur, gehört das Ergebnis zu einem alten Text.
+      if (state.classification !== c || state.anonymized !== text) return;
+      const over = (t) => t && rules.levels.findIndex((l) => l.id === t.level) > rules.levels.findIndex((l) => l.id === rules.freigegeben_bis);
+      Object.assign(c, { anonymized, warn: Boolean(c.credentials || over(c.original) || over(anonymized)), note: null, stale: false });
+      showError(null);
+    } catch (e) {
+      showError("Die Schutzstufe konnte nicht neu bewertet werden: " + e.message + ". Die alte Bewertung bleibt als veraltet stehen.");
+    } finally {
+      reclassifying = false; save(); renderResult();
+    }
   }
 
   function renderMapping() {
