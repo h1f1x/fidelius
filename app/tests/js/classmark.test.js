@@ -140,6 +140,24 @@ test("das Banner nennt den Text der Stufe des anonymisierten Texts und die über
   assert.doesNotMatch(html, /Zugangsdaten/);
 });
 
+test("liegt nur das Original über der Freigabe, sagt das Banner das und nennt die Stufe des anonymisierten Texts", () => {
+  const c = { original: { level: "vertraulich" }, anonymized: { level: "intern" }, warn: true };
+  const html = M.bannerHtml(c, BANNER_RULES, md);
+  assert.match(html, /Das Original liegt über der Freigabe\. Für den anonymisierten Text \(Intern\) gilt:/);
+});
+
+test("liegt der anonymisierte Text über der Freigabe, sagt das Banner das", () => {
+  const c = { original: { level: "vertraulich" }, anonymized: { level: "vertraulich" }, warn: true };
+  const html = M.bannerHtml(c, BANNER_RULES, md);
+  assert.match(html, /Der anonymisierte Text liegt über der Freigabe\. Für die Schutzstufe Vertraulich gilt:/);
+});
+
+test("ist der Text unverändert, spricht das Banner vom Text", () => {
+  const c = { original: { level: "vertraulich" }, anonymized: null, warn: true };
+  const html = M.bannerHtml(c, BANNER_RULES, md);
+  assert.match(html, /Der Text liegt über der Freigabe\. Für die Schutzstufe Vertraulich gilt:/);
+});
+
 test("bei Warnung nur wegen Zugangsdaten steht der Stufentext trotzdem im Banner, ohne Satz zur Freigabe", () => {
   const c = { original: { level: "intern" }, anonymized: null, credentials: true, warn: true };
   const html = M.bannerHtml(c, BANNER_RULES, md);

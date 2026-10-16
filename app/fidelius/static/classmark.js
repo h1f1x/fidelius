@@ -96,6 +96,16 @@
   const warns = (c, rules) => Boolean(c.credentials)
     || [c.original, c.anonymized].some((t) => t && overApproval(rules, t.level));
 
+  // Überschrift des Banners: welcher Text über der Freigabe liegt und wessen Stufe danach folgt.
+  // Liegt nur das Original darüber, ist die genannte Stufe die des anonymisierten Texts, nicht die überschrittene.
+  function bannerHead(c, rules, name) {
+    const over = (t) => t && overApproval(rules, t.level);
+    if (c.anonymized && over(c.anonymized)) return `Der anonymisierte Text liegt über der Freigabe. Für die Schutzstufe ${name} gilt:`;
+    if (c.anonymized && over(c.original)) return `Das Original liegt über der Freigabe. Für den anonymisierten Text (${name}) gilt:`;
+    if (over(c.original)) return `Der Text liegt über der Freigabe. Für die Schutzstufe ${name} gilt:`;
+    return `Für die Schutzstufe ${name} gilt:`;
+  }
+
   // Warnbanner: der Text der Stufe, die für die KI gilt, bei Zugangsdaten zusätzlich deren Hinweis.
   // Der Satz zur Freigabe steht nur, wenn eine Stufe sie wirklich überschreitet.
   function bannerHtml(c, rules, markdown) {
@@ -105,9 +115,7 @@
     const t = c.anonymized || c.original;
     if (t) {
       const lv = rules.levels.find((l) => l.id === t.level) || { name: t.level, text: "" };
-      const over = [c.original, c.anonymized].some((x) => x && overApproval(rules, x.level));
-      const head = over ? "Die Schutzstufe liegt über der Freigabe für KI-Systeme. Es gilt:" : `Für die Schutzstufe ${esc(lv.name)} gilt:`;
-      parts.push(`<div><strong>${head}</strong>${lv.text ? markdown(lv.text) : ""}</div>`);
+      parts.push(`<div><strong>${bannerHead(c, rules, esc(lv.name))}</strong>${lv.text ? markdown(lv.text) : ""}</div>`);
     }
     // Bleibt stehen, auch wenn alle Zugangsdaten ersetzt sind: Ein Secret in der Zwischenablage gilt als offengelegt.
     if (c.credentials) {
