@@ -135,6 +135,14 @@ man ist:
 Fehlt die Datei oder ist sie ungültig, läuft alles wie bei Flag aus, nur `/api/health` meldet den
 Fehler, damit eine vergessene Datei auffällt.
 
+Bei aktiver Klassifikation ersetzt Fidelius außerdem Zugangsdaten durch `[ZUGANG_1]` usw., auch
+wenn das Gate den Text für harmlos hält: bekannte Token-Formate (`sk-`, `ghp_`, `github_pat_`,
+`glpat-`, `xoxb-`, `AKIA…`), JWTs, private Schlüssel im PEM-Format über alle Zeilen und Werte hinter
+Schlüsselwörtern wie `Passwort:` oder `api_key=`. Beim Schlüsselwort wird nur der Wert ersetzt, und
+nur, wenn er eine Ziffer oder ein Sonderzeichen enthält; „Das Passwort: bekommst du per Telefon“
+bleibt stehen. GLiNER-Treffer für Passwort, Secret und API-Key zählen dann ebenfalls zu ZUGANG
+statt zu KENNUNG. Laya bestätigt ZUGANG-Treffer nicht nach.
+
 ## Bedienung
 
 Die Oberfläche ist für Nutzer ohne technisches Vorwissen gedacht. Ein Klick auf „Wie funktioniert

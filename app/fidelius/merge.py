@@ -31,8 +31,10 @@ def merge_hits(hits: list[RawHit], text: str, allowed: set[str] | None = None) -
         # Kategorie: Priorität Regex > GLiNER > spaCy, aber nur unter Treffern, die den
         # gewählten Span (fast) vollständig abdecken, damit ein kleiner Teiltreffer nicht
         # die Kategorie des großen bestimmt.
+        # ZUGANG geht vor: Ein Token, das auch wie eine Kennung aussieht, bleibt ein Zugangsdatum.
         covering = [h for h in group if _coverage(h, start, end) >= 0.6]
-        cat_src = min(covering or [best], key=lambda h: (config.SOURCE_PRIORITY[h.source], -(h.score or 0)))
+        cat_src = min(covering or [best], key=lambda h: (h.category != config.ZUGANG,
+                                                         config.SOURCE_PRIORITY[h.source], -(h.score or 0)))
         sources: dict[tuple[str, str], Source] = {}
         for h in group:
             key = (h.source, h.label)
@@ -58,7 +60,10 @@ _CELL_BREAK = re.compile(r"\n|\t|\||\s{2,}")
 
 def _cut_at_newline(h: RawHit) -> RawHit:
     """Kein Treffer über Zeilenumbruch, Tab, Tabellenstrich oder Mehrfach-Leerzeichen hinweg:
-    spaCy klebt sonst Signatur und Anrede oder Tabellenzellen zusammen."""
+    spaCy klebt sonst Signatur und Anrede oder Tabellenzellen zusammen. Ausgenommen sind
+    Zugangsdaten: Ein privater Schlüssel reicht über viele Zeilen und muss ganz ersetzt werden."""
+    if h.category == config.ZUGANG:
+        return h
     m = _CELL_BREAK.search(h.text)
     if not m:
         return h
@@ -71,9 +76,15 @@ def _coverage(h: RawHit, start: int, end: int) -> float:
 
 
 def _trim(entities: list[Entity], text: str) -> list[Entity]:
-    """Führende/abschließende Leerzeichen und Satzzeichen aus den Spans entfernen."""
+    """Führende/abschließende Leerzeichen und Satzzeichen aus den Spans entfernen.
+
+    Zugangsdaten aus dem Regex-Erkenner bleiben exakt: Das „!“ am Ende von „Sommer2026!“ gehört
+    zum Passwort."""
     out = []
     for e in entities:
+        if e.category == config.ZUGANG and any(src.name == "regex" for src in e.sources):
+            out.append(e)
+            continue
         s, t = e.start, e.end
         while s < t and text[s] in " \t\n\r,;:.!?\"'()[]<>":
             s += 1
