@@ -157,6 +157,13 @@ nur, wenn er eine Ziffer oder ein Sonderzeichen enthält; „Das Passwort: bekom
 bleibt stehen. GLiNER-Treffer für Passwort, Secret und API-Key zählen dann ebenfalls zu ZUGANG
 statt zu KENNUNG. Laya bestätigt ZUGANG-Treffer nicht nach.
 
+Zugangsdaten im Original lösen die Warnung aus, unabhängig von der Stufe: wenn ein ZUGANG-Treffer
+gefunden wurde (auch wenn die Kategorie abgewählt ist) oder wenn Laya in einem Abschnitt auf die
+Frage `zugang` mindestens `ZUGANG_THRESHOLD` antwortet. Die Frage läuft im selben Batch wie das Gate,
+ihr Wert steht je Abschnitt in `classification.original.chunks[].credentials`. Das Banner rät zum
+Austauschen, auch wenn alle Zugangsdaten ersetzt sind: Ein Secret, das einmal in einer
+Zwischenablage lag, gilt als offengelegt. Darunter steht `zugangsdaten.text` aus der Regeldatei.
+
 ## Bedienung
 
 Die Oberfläche ist für Nutzer ohne technisches Vorwissen gedacht. Ein Klick auf „Wie funktioniert
@@ -264,6 +271,7 @@ App protokolliert, gelten dort als wesentliche Änderung und gehen vorher an den
 | `NOTICE_FILE` | /opt/local/hinweise.md | Pfad im Container für die Hinweise dieser Installation im Splash-Screen; `./local` ist dorthin gemountet |
 | `CLASSIFICATION_ENABLED` | 0 | `1` schaltet die Klassifikation an (siehe Klassifikation), wirkt nach Neustart des Containers |
 | `CLASSIFICATION_FILE` | /opt/local/klassifikation.yaml | Pfad im Container für die Klassifikationsregeln dieser Installation |
+| `ZUGANG_THRESHOLD` | 0.5 | Laya-Wert der Frage `zugang` in einem Abschnitt, ab dem die Klassifikation vor Zugangsdaten warnt |
 | `REQUEST_LOG` | /var/log/fidelius/requests.jsonl | Pfad im Container für das Request-Log (eine JSON-Zeile je Prüfung, ohne Text); nur unter `/var/log/fidelius` liegt es auf dem Volume `request-log` |
 
 Kategorien, Farben, Label-Zuordnungen und die Laya-Fragen stehen in `app/fidelius/config.py`.
