@@ -149,3 +149,8 @@ def test_config_lists_levels_without_laya_descriptions(client, enabled, monkeypa
     assert c["zugangsdaten_text"] == "Nie in ein KI-System."
     assert c["levels"][0] == {"id": "oeffentlich", "name": "Öffentlich", "text": "Darf in jedes KI-System."}
     assert "laya" not in str(c)
+
+
+def test_config_reports_threshold_for_expert_view(client, enabled, monkeypatch, tmp_path):
+    monkeypatch.setattr(config, "CLASSIFICATION_FILE", _write(tmp_path, VALID))
+    assert client.get("/api/config").json()["classification"]["schwelle"] == 0.3

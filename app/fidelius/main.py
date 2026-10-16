@@ -94,6 +94,7 @@ def _classification_config() -> dict | None:
     return {
         "levels": [{"id": lv.id, "name": lv.name, "text": lv.text} for lv in rules.levels],
         "freigegeben_bis": rules.approved_up_to,
+        "schwelle": rules.threshold,
         "zugangsdaten_text": rules.credentials_text,
     }
 
