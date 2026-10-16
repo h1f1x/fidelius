@@ -324,18 +324,11 @@
   function classificationHtml() {
     const c = state.classification, rules = CONFIG.classification;
     if (!c || !rules || !state.text) return "";
-    if (!c.original) return `<div class="classbadge"><span class="muted">Schutzstufe: ${esc(c.note || "keine Einschätzung möglich")}</span></div>`;
-    const level = (id) => rules.levels.find((l) => l.id === id) || { id, name: id, text: "" };
-    const rank = (id) => rules.levels.findIndex((l) => l.id === id);
-    const chip = (t, kind) => `<button type="button" class="lvl${rank(t.level) > rank(rules.freigegeben_bis) ? " over" : ""}" data-jump="${kind}" title="Zum Abschnitt springen, der die Stufe bestimmt">${esc(level(t.level).name)}</button>`;
+    const banner = ClassMark.bannerHtml(c, rules, markdown);
+    if (!c.original) return `<div class="classbadge"><span class="muted">Schutzstufe: ${esc(c.note || "keine Einschätzung möglich")}</span></div>${banner}`;
+    const name = (id) => (rules.levels.find((l) => l.id === id) || { name: id }).name;
+    const chip = (t, kind) => `<button type="button" class="lvl${ClassMark.overApproval(rules, t.level) ? " over" : ""}" data-jump="${kind}" title="Zum Abschnitt springen, der die Stufe bestimmt">${esc(name(t.level))}</button>`;
     const badge = c.anonymized ? `Original: ${chip(c.original, "original")} → Anonymisiert: ${chip(c.anonymized, "anonymized")}` : chip(c.original, "original");
-    // Maßgeblich ist der Text, der in die KI geht: der anonymisierte, solange es keine eigene Bewertung gibt das Original.
-    const rule = level((c.anonymized || c.original).level).text;
-    const over = [c.original, c.anonymized].some((t) => t && rank(t.level) > rank(rules.freigegeben_bis));
-    const levelPart = over ? `<div><strong>Die Schutzstufe liegt über der Freigabe für KI-Systeme. Es gilt:</strong>${rule ? markdown(rule) : ""}</div>` : "";
-    // Bleibt stehen, auch wenn alle Zugangsdaten ersetzt sind: Ein Secret in der Zwischenablage gilt als offengelegt.
-    const credPart = c.credentials ? `<div><strong>Im Original stehen Zugangsdaten. Auch wenn sie ersetzt sind, sollten sie als offengelegt gelten und ausgetauscht werden.</strong>${markdown(rules.zugangsdaten_text || "Zugangsdaten gehören nicht in KI-Systeme.")}</div>` : "";
-    const banner = c.warn ? `<div class="classwarn" role="alert">${levelPart}${credPart}</div>` : "";
     const note = c.note ? ` <span class="muted">${esc(c.note)}</span>` : "";
     const stale = c.stale ? ` <span class="stale">veraltet</span> <button id="reclassify" class="small"${reclassifying ? " disabled" : ""}>${reclassifying ? "bewerte …" : "neu bewerten"}</button>` : "";
     return `<div class="classbadge">Schutzstufe: ${badge}${stale}${note}</div>${banner}${ClassMark.expertHtml(c, rules)}`;
@@ -367,8 +360,8 @@
       const anonymized = await api("/api/classify", { text });
       // Kam während der Bewertung eine weitere Korrektur, gehört das Ergebnis zu einem alten Text.
       if (state.classification !== c || state.anonymized !== text) return;
-      const over = (t) => t && rules.levels.findIndex((l) => l.id === t.level) > rules.levels.findIndex((l) => l.id === rules.freigegeben_bis);
-      Object.assign(c, { anonymized, warn: Boolean(c.credentials || over(c.original) || over(anonymized)), note: null, stale: false });
+      Object.assign(c, { anonymized, note: null, stale: false });
+      c.warn = ClassMark.warns(c, rules);
       showError(null);
     } catch (e) {
       showError("Die Schutzstufe konnte nicht neu bewertet werden: " + e.message + ". Die alte Bewertung bleibt als veraltet stehen.");
