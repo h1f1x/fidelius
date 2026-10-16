@@ -67,6 +67,7 @@
     }
     renderVersion(CONFIG.build);
     renderLimit();
+    $("classInfo").classList.toggle("hidden", !CONFIG.classification);
     initSplash(CONFIG.notice);
     $("threshold").value = CONFIG.gate_threshold; $("thresholdValue").textContent = Number(CONFIG.gate_threshold).toFixed(2);
     try {
@@ -184,7 +185,7 @@
     clearInterval(clock); tick(); clock = setInterval(tick, 100);
     try {
       const res = await api("/api/analyze", { text, gate_threshold: Number($("threshold").value), force, use_laya_check: $("layaCheck").checked });
-      state = { text: res.text, entities: res.entities, mapping: res.mapping, anonymized: res.anonymized_text, gate: res.gate, timing: res.timing, elapsed_ms: Math.round(performance.now() - t0) };
+      state = { text: res.text, entities: res.entities, mapping: res.mapping, anonymized: res.anonymized_text, gate: res.gate, timing: res.timing, elapsed_ms: Math.round(performance.now() - t0), classification: res.classification || null };
       // Fertig ist fertig, auch früher als geschätzt, etwa wenn das Gate den Text als harmlos einstuft.
       bar.value = 100;
       save(); render();
@@ -297,10 +298,28 @@
     const empty = !text ? '<span class="hint">Hier erscheint der anonymisierte Text.</span>' : "";
     area.innerHTML = `<div class="resulthead"><h2>Anonymisierter Text</h2><div class="seg"><button data-view="annot" class="${viewMode === "annot" ? "on" : ""}">mit Markierungen</button><button data-view="plain" class="${viewMode === "plain" ? "on" : ""}">so wie er kopiert wird</button></div><button id="copyAnon" class="primary">Anonymisierten Text kopieren</button></div>
       <div class="viewnote">${viewMode === "annot" ? "Durchgestrichen = Original, farbig = Platzhalter. Kopiert wird nur der anonymisierte Text, ohne Originale. Klick auf eine Stelle, um sie zu ändern." : "Genau dieser Text landet in der Zwischenablage. Klick auf einen Platzhalter zeigt das Original."}</div>
+      ${classificationHtml()}
       <div class="annotated-text${viewMode === "plain" ? " plain" : ""}">${empty || tokens(text, ents, viewMode)}</div>`;
     area.querySelectorAll(".seg button").forEach((b) => { b.onclick = () => { viewMode = b.dataset.view; renderResult(); }; });
   }
 
+
+  // ---------- Schutzstufe ----------
+  // Nur bei aktiver Klassifikation: Dann liefern /api/config die Stufen und /api/analyze die Bewertung.
+  // Bis freigegeben_bis ist eine Stufe neutral, darüber in Warnfarbe.
+  function classificationHtml() {
+    const c = state.classification, rules = CONFIG.classification;
+    if (!c || !rules || !state.text) return "";
+    if (!c.original) return `<div class="classbadge"><span class="muted">Schutzstufe: ${esc(c.note || "keine Einschätzung möglich")}</span></div>`;
+    const level = (id) => rules.levels.find((l) => l.id === id) || { id, name: id, text: "" };
+    const rank = (id) => rules.levels.findIndex((l) => l.id === id);
+    const chip = (t) => `<span class="lvl${rank(t.level) > rank(rules.freigegeben_bis) ? " over" : ""}">${esc(level(t.level).name)}</span>`;
+    const badge = c.anonymized ? `Original: ${chip(c.original)} → Anonymisiert: ${chip(c.anonymized)}` : chip(c.original);
+    // Maßgeblich ist der Text, der in die KI geht: der anonymisierte, solange es keine eigene Bewertung gibt das Original.
+    const rule = level((c.anonymized || c.original).level).text;
+    const banner = c.warn ? `<div class="classwarn" role="alert"><strong>Die Schutzstufe liegt über der Freigabe für KI-Systeme. Es gilt:</strong>${rule ? markdown(rule) : ""}</div>` : "";
+    return `<div class="classbadge">Schutzstufe: ${badge}</div>${banner}`;
+  }
 
   function renderMapping() {
     const tb = $("mapping").querySelector("tbody");
