@@ -162,10 +162,11 @@
     : empty("Keine Fehler im Zeitraum.");
 
   // Zählt nur Anfragen mit Klassifikation; ältere Einträge und solche mit Flag aus fehlen hier.
+  // Ist die Klassifikation aus, liefert /api/report null und die Kachel entfällt (Spec 1).
   function classificationTable(c) {
     const rows = c.levels.map((lv) => `<tr><td>${esc(lv.name)}</td>${numCell(integer(lv.original))}${numCell(integer(lv.anonymized))}</tr>`).join("");
     const noLevel = c.no_level ? `<tr><td class="muted">ohne Stufe (Laya nicht erreichbar)</td>${numCell(integer(c.no_level))}<td></td></tr>` : "";
-    const lowered = c.lowered === null ? "–" : `${integer(c.lowered)} (${percent(c.lowered_share)})`;
+    const lowered = `${integer(c.lowered)} (${percent(c.lowered_share)})`;
     return `<table><thead><tr><th>Stufe</th><th class="num">Original</th><th class="num">anonymisiert</th></tr></thead>
       <tbody>${rows}${noLevel}</tbody></table>
       <table><tbody>
@@ -173,7 +174,7 @@
         <tr><td>gewarnt</td>${numCell(`${integer(c.warned)} (${percent(c.warned_share)})`)}</tr>
         <tr><td>davon Zugangsdaten gefunden</td>${numCell(integer(c.credentials))}</tr>
       </tbody></table>
-      <p class="hint">${integer(c.requests)} Anfragen mit Klassifikation. „Gesenkt“ bezieht sich auf Anfragen mit beiden Stufen und braucht aktive Klassifikationsregeln für die Reihenfolge.</p>`;
+      <p class="hint">${integer(c.requests)} Anfragen mit Klassifikation. „Gesenkt“ bezieht sich auf Anfragen mit beiden Stufen; bei unverändertem Text gilt die Stufe des Originals für beide.</p>`;
   }
 
   // ---------- Seite ----------

@@ -100,3 +100,51 @@ test("ein Treffer gehört zu jedem Abschnitt, den er berührt", () => {
   assert.deepEqual(M.kindsAt(5, 11, ranges), ["original"]);
   assert.deepEqual(M.kindsAt(10, 12, ranges), ["original", "anonymized"]);
 });
+
+// ---- Freigabe und Warnbanner (Spec Abschnitt 7) ----------------------------------------------
+
+const BANNER_RULES = {
+  freigegeben_bis: "intern",
+  zugangsdaten_text: "Nie in ein KI-System.",
+  levels: [
+    { id: "oeffentlich", name: "Öffentlich", text: "Darf in jedes KI-System." },
+    { id: "intern", name: "Intern", text: "Nur in freigegebene KI-Systeme." },
+    { id: "vertraulich", name: "Vertraulich", text: "Nur mit Freigabe." },
+  ],
+};
+const md = (s) => `<p>${s}</p>`;
+
+test("über der Freigabe liegt nur eine Stufe oberhalb von freigegeben_bis", () => {
+  assert.equal(M.overApproval(BANNER_RULES, "intern"), false);
+  assert.equal(M.overApproval(BANNER_RULES, "vertraulich"), true);
+  assert.equal(M.overApproval(BANNER_RULES, "oeffentlich"), false);
+});
+
+test("gewarnt wird bei Zugangsdaten oder wenn eine der beiden Stufen über der Freigabe liegt", () => {
+  const t = (level) => ({ level });
+  assert.equal(M.warns({ original: t("intern"), anonymized: t("oeffentlich"), credentials: false }, BANNER_RULES), false);
+  assert.equal(M.warns({ original: t("vertraulich"), anonymized: t("intern"), credentials: false }, BANNER_RULES), true);
+  assert.equal(M.warns({ original: t("intern"), anonymized: t("vertraulich"), credentials: false }, BANNER_RULES), true);
+  assert.equal(M.warns({ original: t("intern"), anonymized: null, credentials: true }, BANNER_RULES), true);
+});
+
+test("ohne Warnung kein Banner", () => {
+  assert.equal(M.bannerHtml({ original: { level: "vertraulich" }, warn: false }, BANNER_RULES, md), "");
+});
+
+test("das Banner nennt den Text der Stufe des anonymisierten Texts und die überschrittene Freigabe", () => {
+  const c = { original: { level: "vertraulich" }, anonymized: { level: "intern" }, warn: true };
+  const html = M.bannerHtml(c, BANNER_RULES, md);
+  assert.match(html, /über der Freigabe/);
+  assert.match(html, /Nur in freigegebene KI-Systeme\./);
+  assert.doesNotMatch(html, /Zugangsdaten/);
+});
+
+test("bei Warnung nur wegen Zugangsdaten steht der Stufentext trotzdem im Banner, ohne Satz zur Freigabe", () => {
+  const c = { original: { level: "intern" }, anonymized: null, credentials: true, warn: true };
+  const html = M.bannerHtml(c, BANNER_RULES, md);
+  assert.match(html, /Nur in freigegebene KI-Systeme\./);
+  assert.doesNotMatch(html, /über der Freigabe/);
+  assert.match(html, /Im Original stehen Zugangsdaten/);
+  assert.match(html, /Nie in ein KI-System\./);
+});

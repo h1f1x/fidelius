@@ -1,5 +1,5 @@
-/* Schutzstufe im Text: Markierung des auslösenden Abschnitts und Expertenansicht je Abschnitt
-   (docs/specs/klassifikation.md, Abschnitt 7). Reine Funktionen ohne DOM; im Browser als
+/* Schutzstufe im Text: Markierung des auslösenden Abschnitts, Freigabe und Warnbanner, Expertenansicht
+   je Abschnitt (docs/specs/klassifikation.md, Abschnitt 7). Reine Funktionen ohne DOM; im Browser als
    window.ClassMark, unter Node per require für die Tests. */
 (function (root) {
   // Treffer, die im anonymisierten Text durch ihren Platzhalter ersetzt sind, in derselben Auswahl wie
@@ -88,7 +88,35 @@
     return `<div class="classexpert expert-only"><div class="muted">Je Abschnitt · Schwelle ${pct(rules.schwelle)}</div>${parts.join("")}</div>`;
   }
 
-  const api = { toOriginal, triggerRanges, kindsAt, pieces, expertHtml };
+  // Rang = Position in rules.levels, von niedrig nach hoch. Bis freigegeben_bis geht eine Stufe ohne Warnung durch.
+  const rank = (rules, id) => rules.levels.findIndex((l) => l.id === id);
+  const overApproval = (rules, id) => rank(rules, id) > rank(rules, rules.freigegeben_bis);
+
+  // Dieselbe Regel wie classification.summarize auf dem Server; „neu bewerten“ rechnet damit nach.
+  const warns = (c, rules) => Boolean(c.credentials)
+    || [c.original, c.anonymized].some((t) => t && overApproval(rules, t.level));
+
+  // Warnbanner: der Text der Stufe, die für die KI gilt, bei Zugangsdaten zusätzlich deren Hinweis.
+  // Der Satz zur Freigabe steht nur, wenn eine Stufe sie wirklich überschreitet.
+  function bannerHtml(c, rules, markdown) {
+    if (!c || !c.warn) return "";
+    const parts = [];
+    // Maßgeblich ist der Text, der in die KI geht: der anonymisierte, ohne eigene Bewertung das Original.
+    const t = c.anonymized || c.original;
+    if (t) {
+      const lv = rules.levels.find((l) => l.id === t.level) || { name: t.level, text: "" };
+      const over = [c.original, c.anonymized].some((x) => x && overApproval(rules, x.level));
+      const head = over ? "Die Schutzstufe liegt über der Freigabe für KI-Systeme. Es gilt:" : `Für die Schutzstufe ${esc(lv.name)} gilt:`;
+      parts.push(`<div><strong>${head}</strong>${lv.text ? markdown(lv.text) : ""}</div>`);
+    }
+    // Bleibt stehen, auch wenn alle Zugangsdaten ersetzt sind: Ein Secret in der Zwischenablage gilt als offengelegt.
+    if (c.credentials) {
+      parts.push(`<div><strong>Im Original stehen Zugangsdaten. Auch wenn sie ersetzt sind, sollten sie als offengelegt gelten und ausgetauscht werden.</strong>${markdown(rules.zugangsdaten_text || "Zugangsdaten gehören nicht in KI-Systeme.")}</div>`);
+    }
+    return `<div class="classwarn" role="alert">${parts.join("")}</div>`;
+  }
+
+  const api = { toOriginal, triggerRanges, kindsAt, pieces, expertHtml, overApproval, warns, bannerHtml };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.ClassMark = api;
 })(this);

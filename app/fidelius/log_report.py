@@ -35,11 +35,13 @@ Antwort von report() bzw. GET /api/report?period=24h|7d|30d|all (Standard 30d):
                     (0.2 = 20 % langsamer, negativ = schneller)
     calibration     {texts: [Zeichenzahlen], rows: [{build, runs, median_ms: [je Text]}]}
     errors          [{text, count, last}], häufigste zuerst
-    classification  {requests, levels: [{level, name, original, anonymized}], no_level, lowered,
-                     lowered_share, warned, warned_share, credentials}; zählt nur Anfragen mit
+    classification  null ohne aktive Regeln (report(..., rules=)), dann zeigt /auswertung keine
+                    Tabelle, auch wenn ältere Einträge Stufen tragen. Sonst {requests,
+                    levels: [{level, name, original, anonymized}], no_level, lowered,
+                    lowered_share, warned, warned_share, credentials}; zählt nur Anfragen mit
                     stufe_original im Eintrag (Klassifikation an); levels in der Reihenfolge der
-                    aktiven Regeln (report(..., rules=)), ohne Regeln in der des Auftauchens und
-                    lowered = null; lowered_share bezogen auf Anfragen mit beiden Stufen
+                    Regeln; lowered_share bezogen auf Anfragen mit beiden Stufen (bei
+                    unverändertem Text sind beide gleich, null nur bei Laya-Fehler)
 
 GET /api/request-log liefert die Rohdatei als application/x-ndjson, 404 wenn sie fehlt.
 """
@@ -331,15 +333,16 @@ def _errors(requests: list[dict]) -> list[dict]:
 
 # ---------- classification ----------
 
-def _classification(requests: list[dict], rules: Rules | None) -> dict:
+def _classification(requests: list[dict], rules: Rules | None) -> dict | None:
     """Zählt nur Einträge mit Klassifikation; ältere oder mit Flag aus haben das Feld nicht.
 
-    Reihenfolge und Namen der Stufen kommen aus den aktiven Regeln, denn das Log kennt nur ids.
-    Ohne Regeln stehen die ids in der Reihenfolge ihres Auftauchens, und ob die Anonymisierung
-    eine Stufe gesenkt hat, ist nicht bestimmbar (lowered = null). Eine id, die die Regeln nicht
-    mehr kennen, steht am Ende und zählt nie als gesenkt."""
+    Ohne aktive Regeln ist die Klassifikation aus, dann gibt es keine Auswertung (Spec 1).
+    Reihenfolge und Namen der Stufen kommen aus den Regeln, denn das Log kennt nur ids. Eine id,
+    die die Regeln nicht mehr kennen, steht am Ende und zählt nie als gesenkt."""
+    if rules is None:
+        return None
     rows = [e for e in requests if "stufe_original" in e]
-    names = {lv.id: lv.name for lv in rules.levels} if rules else {}
+    names = {lv.id: lv.name for lv in rules.levels}
     order = list(names)
     for e in rows:
         for key in ("stufe_original", "stufe_anonymisiert"):
@@ -351,18 +354,16 @@ def _classification(requests: list[dict], rules: Rules | None) -> dict:
               for lv in order]
     both = [e for e in rows
             if isinstance(e["stufe_original"], str) and isinstance(e.get("stufe_anonymisiert"), str)]
-    lowered = None
-    if rules:
-        rank = {lv: i for i, lv in enumerate(names)}
-        lowered = sum(e["stufe_original"] in rank and e["stufe_anonymisiert"] in rank
-                      and rank[e["stufe_anonymisiert"]] < rank[e["stufe_original"]] for e in both)
+    rank = {lv: i for i, lv in enumerate(names)}
+    lowered = sum(e["stufe_original"] in rank and e["stufe_anonymisiert"] in rank
+                  and rank[e["stufe_anonymisiert"]] < rank[e["stufe_original"]] for e in both)
     warned = sum(bool(e.get("gewarnt")) for e in rows)
     return {
         "requests": len(rows),
         "levels": levels,
         "no_level": sum(not isinstance(e["stufe_original"], str) for e in rows),
         "lowered": lowered,
-        "lowered_share": None if lowered is None else _share(lowered, len(both)),
+        "lowered_share": _share(lowered, len(both)),
         "warned": warned,
         "warned_share": _share(warned, len(rows)),
         "credentials": sum(bool(e.get("zugangsdaten")) for e in rows),

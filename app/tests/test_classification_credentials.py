@@ -6,44 +6,22 @@ Laya-Frage `zugang` in einem Abschnitt.
 from __future__ import annotations
 
 import pytest
-from fastapi.testclient import TestClient
 
-from fidelius import config, main
-from fidelius.laya_client import GateResult, Section
-from fidelius.main import app
-from fidelius.pipeline import Pipeline
+from fidelius import config
 
-from .test_classification_analyze import analyze, enabled, rules_file  # noqa: F401
-
-APPROVED = {"oeffentlich": 0.1, "intern": 0.8, "vertraulich": 0.1}  # Stufe = freigegeben_bis
+from .conftest import INTERN, Chunk, FakeLaya, analyze_http
 
 
-class CredentialLaya:
+def credential_laya(*chunks: Chunk) -> FakeLaya:
     """Gate harmlos, Stufe freigegeben; je Abschnitt ein fester Wert für `zugang`."""
-
-    def __init__(self, *section_zugang: tuple[int, int, float]):
-        self.section_zugang = section_zugang
-        self.extras: list[dict | None] = []
-
-    def gate(self, text: str, extra: dict[str, dict] | None = None) -> GateResult:
-        self.extras.append(extra)
-        parts = self.section_zugang or ((0, len(text), 0.0),)
-        sections = []
-        for start, end, zugang in parts:
-            answers = {"pii": {"noul": 0.1}}
-            if extra and "stufe" in extra:
-                answers["stufe"] = {"choice": "intern", "probabilities": APPROVED}
-            if extra and "zugang" in extra:
-                answers["zugang"] = {"noul": zugang}
-            sections.append(Section(start, end, text[start:end], answers))
-        return GateResult(probability=0.1, sections=sections)
+    return FakeLaya(0.1, chunks=chunks or (Chunk(stufe=INTERN),))
 
 
 PASSWORD_TEXT = "Für den Server gilt passwort: Sommer2026! ab sofort."
 
 
 def test_credential_hit_alone_warns(enabled):
-    res = analyze(CredentialLaya(), PASSWORD_TEXT)
+    res = analyze_http(credential_laya(), PASSWORD_TEXT)
     c = res["classification"]
 
     assert any(e["category"] == "ZUGANG" for e in res["entities"])
@@ -53,7 +31,7 @@ def test_credential_hit_alone_warns(enabled):
 
 
 def test_warning_stays_when_credentials_are_replaced(enabled):
-    res = analyze(CredentialLaya(), PASSWORD_TEXT)
+    res = analyze_http(credential_laya(), PASSWORD_TEXT)
 
     assert "Sommer2026!" not in res["anonymized_text"]
     assert res["classification"]["credentials"] is True
@@ -61,11 +39,7 @@ def test_warning_stays_when_credentials_are_replaced(enabled):
 
 def test_warning_stays_when_credentials_category_is_deselected(enabled):
     """Abgewählt bleibt das Passwort im Text stehen, die Warnung erst recht."""
-    pipeline = Pipeline(laya=CredentialLaya(), detectors=[], clock=lambda: 0.0)
-    with pytest.MonkeyPatch.context() as mp:
-        mp.setattr(main, "pipeline", pipeline)
-        r = TestClient(app).post("/api/analyze", json={"text": PASSWORD_TEXT, "categories": ["PERSON"]})
-    res = r.json()
+    res = analyze_http(credential_laya(), PASSWORD_TEXT, categories=["PERSON"])
 
     assert "Sommer2026!" in res["anonymized_text"]
     assert res["classification"]["credentials"] is True
@@ -78,7 +52,7 @@ PLAIN = "Die Kantine hat ein neues Menü.\n\nDer Zugang zum Lager läuft über d
 @pytest.mark.parametrize("zugang, warn", [(0.49, False), (0.5, True)])
 def test_laya_value_at_threshold_alone_warns(enabled, monkeypatch, zugang, warn):
     monkeypatch.setattr(config, "ZUGANG_THRESHOLD", 0.5)
-    res = analyze(CredentialLaya((0, 31, 0.1), (33, len(PLAIN), zugang)), PLAIN)
+    res = analyze_http(credential_laya(Chunk(0, 31, INTERN, 0.1), Chunk(33, None, INTERN, zugang)), PLAIN)
     c = res["classification"]
 
     assert not any(e["category"] == "ZUGANG" for e in res["entities"])

@@ -59,8 +59,16 @@ class Timing(BaseModel):
     detect_ms: int = 0
     laya_check_ms: int = 0
     # Zweiter Laya-Durchlauf auf dem anonymisierten Text; das Original steckt in gate_ms.
-    classification_ms: int = 0
+    # Nur bei aktiver Klassifikation, sonst fehlt das Feld wie vor der Klassifikation.
+    classification_ms: int | None = None
     total_ms: int = 0
+
+    @model_serializer(mode="wrap")
+    def _omit_missing_classification(self, handler: SerializerFunctionWrapHandler) -> dict:
+        data = handler(self)
+        if data.get("classification_ms") is None:
+            data.pop("classification_ms", None)
+        return data
 
 
 class MappingEntry(BaseModel):

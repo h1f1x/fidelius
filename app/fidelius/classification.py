@@ -13,7 +13,7 @@ from . import config
 from .models import ChunkLevel, Classification, Span, TextLevel
 
 if TYPE_CHECKING:
-    from .laya_client import Section
+    from .laya_client import LayaClient, Section
 
 # Mit den Kalibrierbeispielen festgelegt (docs/specs/klassifikation.md, Abschnitt 9).
 DEFAULT_THRESHOLD = 0.4
@@ -54,53 +54,93 @@ def load_rules(path: str) -> Rules:
         raise RulesError(f"Regeldatei nicht lesbar ({path}): {exc}") from None
     try:
         data = yaml.safe_load(raw)
+        root = yaml.compose(raw, Loader=yaml.SafeLoader)
     except yaml.YAMLError as exc:
         mark = getattr(exc, "problem_mark", None)
         where = f"Zeile {mark.line + 1}: " if mark else ""
         raise RulesError(f"{where}{getattr(exc, 'problem', None) or exc}") from None
-    return _parse(data)
+    return _parse(data, _Lines(root))
 
 
-def _parse(data: object) -> Rules:
+class _Lines:
+    """Zeilennummern zur Regeldatei aus dem YAML-Knotenbaum, damit auch inhaltliche Fehler wie
+    eine doppelte id die Stelle nennen."""
+
+    def __init__(self, root: yaml.Node | None):
+        self.root = root
+
+    def error(self, msg: str, *path: str | int) -> RulesError:
+        """Fehler an der Stelle `path` (Schlüssel und Listenindex); fehlt sie, am nächsten
+        vorhandenen Knoten darüber."""
+        node, line = self.root, None
+        if node is not None:
+            line = node.start_mark.line
+        for key in path:
+            if isinstance(node, yaml.MappingNode):
+                pair = next(((k, v) for k, v in node.value if k.value == key), None)
+                if pair is None:
+                    break
+                line, node = pair[0].start_mark.line, pair[1]
+            elif isinstance(node, yaml.SequenceNode) and isinstance(key, int) and key < len(node.value):
+                node = node.value[key]
+                line = node.start_mark.line
+            else:
+                break
+        return RulesError(msg if line is None else f"Zeile {line + 1}: {msg}")
+
+
+def _parse(data: object, lines: _Lines) -> Rules:
     if not isinstance(data, dict):
-        raise RulesError("Die Regeldatei muss eine Zuordnung mit stufen und freigegeben_bis sein")
+        raise lines.error("Die Regeldatei muss eine Zuordnung mit stufen und freigegeben_bis sein")
     raw_levels = data.get("stufen")
     if not isinstance(raw_levels, list) or len(raw_levels) < 2:
-        raise RulesError("stufen braucht mindestens zwei Einträge")
+        raise lines.error("stufen braucht mindestens zwei Einträge", "stufen")
     levels: list[Level] = []
     for n, item in enumerate(raw_levels, 1):
         if not isinstance(item, dict):
-            raise RulesError(f"Stufe {n} ist keine Zuordnung")
+            raise lines.error(f"Stufe {n} ist keine Zuordnung", "stufen", n - 1)
         missing = [k for k in ("id", "name", "laya", "text") if not str(item.get(k) or "").strip()]
         if missing:
-            raise RulesError(f"Stufe {n} ({item.get('id', '?')}): es fehlt {', '.join(missing)}")
+            raise lines.error(f"Stufe {n} ({item.get('id', '?')}): es fehlt {', '.join(missing)}",
+                              "stufen", n - 1)
         lv = Level(*(str(item[k]).strip() for k in ("id", "name", "laya", "text")))
         if any(o.id == lv.id for o in levels):
-            raise RulesError(f"Stufe {n}: id {lv.id} ist doppelt")
+            raise lines.error(f"Stufe {n}: id {lv.id} ist doppelt", "stufen", n - 1, "id")
         levels.append(lv)
     approved = str(data.get("freigegeben_bis") or "")
     if approved not in {lv.id for lv in levels}:
-        raise RulesError(f"freigegeben_bis: {approved or '(leer)'} ist keine id aus stufen")
+        raise lines.error(f"freigegeben_bis: {approved or '(leer)'} ist keine id aus stufen",
+                          "freigegeben_bis")
     threshold = data.get("schwelle", DEFAULT_THRESHOLD)
     if not isinstance(threshold, (int, float)) or not 0 < threshold <= 1:
-        raise RulesError(f"schwelle muss zwischen 0 und 1 liegen, nicht {threshold}")
+        raise lines.error(f"schwelle muss zwischen 0 und 1 liegen, nicht {threshold}", "schwelle")
     creds = data.get("zugangsdaten") or {}
     creds_text = str(creds.get("text") or "").strip() if isinstance(creds, dict) else ""
     return Rules(tuple(levels), approved, float(threshold), creds_text or None)
 
 
-def active_rules() -> tuple[Rules | None, str]:
-    """Die Regeln, falls Flag an und Datei gültig, dazu der Status für /api/health.
+def rules() -> Rules | None:
+    """Die Regeln, falls Flag an und Datei gültig, sonst None (Klassifikation aus).
 
-    Liest die Datei bei jedem Aufruf, damit eine Änderung ohne Neustart wirkt.
+    Liest die Datei bei jedem Aufruf, damit eine Änderung ohne Neustart wirkt; je Anfrage
+    deshalb nur einmal aufrufen und das Ergebnis weiterreichen.
     """
+    return _active()[0]
+
+
+def status() -> str:
+    """Zustand für /api/health: aus, aktiv mit Zahl der Stufen oder Fehler mit Zeile."""
+    return _active()[1]
+
+
+def _active() -> tuple[Rules | None, str]:
     if not config.CLASSIFICATION_ENABLED:
         return None, "aus"
     try:
-        rules = load_rules(config.CLASSIFICATION_FILE)
+        loaded = load_rules(config.CLASSIFICATION_FILE)
     except RulesError as exc:
         return None, f"Fehler: {exc}"
-    return rules, f"aktiv: {len(rules.levels)} Stufen"
+    return loaded, f"aktiv: {len(loaded.levels)} Stufen"
 
 
 def categories(rules: Rules | None) -> dict[str, dict[str, str]]:
@@ -133,6 +173,12 @@ def questions(rules: Rules) -> dict[str, dict]:
         },
         CREDENTIALS_QUESTION: {"type": "noul", "instructions": CREDENTIALS_INSTRUCTIONS},
     }
+
+
+def classify_text(laya: LayaClient, rules: Rules, text: str) -> TextLevel:
+    """Eigener Laya-Durchlauf nur mit den Klassifikationsfragen, ohne Gate: für den
+    anonymisierten Text und für „neu bewerten“. Laya-Fehler gehen an den Aufrufer."""
+    return assess(rules, laya.ask(text, questions(rules)))
 
 
 def assess(rules: Rules, sections: Sequence[Section]) -> TextLevel:

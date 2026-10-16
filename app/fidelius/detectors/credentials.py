@@ -11,12 +11,12 @@ from collections.abc import Iterator
 import re2
 
 from .base import RawHit
-from .regex_det import _bounded, _char_offsets, _spans
+from .regex_det import bounded, char_offsets, spans
 
 CATEGORY = "ZUGANG"
 
 # Bekannte Präfixe der großen Anbieter. Die Mindestlängen halten Wörter wie „sk-Fahrer“ fern.
-_TOKEN = _bounded(
+_TOKEN = bounded(
     r"(?:"
     r"sk-[A-Za-z0-9_\-]{20,}"               # OpenAI, auch sk-proj-; Anthropic sk-ant-
     r"|gh[pousr]_[A-Za-z0-9]{30,}"          # GitHub: ghp_, gho_, ghu_, ghs_, ghr_
@@ -26,7 +26,7 @@ _TOKEN = _bounded(
     r"|AKIA[0-9A-Z]{16}"                     # AWS Access Key ID
     r")"
 )
-_JWT = _bounded(r"eyJ[A-Za-z0-9_\-]+\.eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+")
+_JWT = bounded(r"eyJ[A-Za-z0-9_\-]+\.eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+")
 
 # Der Block reicht über alle Zeilen bis zum END. Fehlt das END, weil der Schlüssel abgeschnitten
 # eingefügt wurde, gilt der Rest des Texts als Schlüssel: lieber zu viel ersetzt als ein halber
@@ -38,7 +38,7 @@ _PEM = re2.compile(
 
 # Schlüsselwort, dann „:“ oder „=“, dann der Wert ohne Leerzeichen, wahlweise in Anführungszeichen.
 # Ersetzt wird nur der Wert. Ein Präfix wie in DB_PASSWORD oder app-secret gehört zum Schlüsselwort.
-_KEYWORD = _bounded(
+_KEYWORD = bounded(
     r"(?i:(?:[a-z0-9]+[_\-])*"
     r"(?:passwort|password|passwd|pwd|kennwort|token|api[_\-]?key|client_secret|secret))"
     r"[ \t]*[:=][ \t]*[\"']?(?P<wert>[^ \t\r\n\"']+)",
@@ -56,9 +56,9 @@ def detect_credentials(text: str) -> list[RawHit]:
 
     for s, e in _pem_spans(text, raw):
         add(s, e, "private_key")
-    for s, e in _spans(_TOKEN, text, raw):
+    for s, e in spans(_TOKEN, text, raw):
         add(s, e, "token")
-    for s, e in _spans(_JWT, text, raw):
+    for s, e in spans(_JWT, text, raw):
         add(s, e, "jwt")
     for s, e in _keyword_values(text, raw):
         add(s, e, "keyword")
@@ -66,14 +66,14 @@ def detect_credentials(text: str) -> list[RawHit]:
 
 
 def _pem_spans(text: str, raw: bytes) -> Iterator[tuple[int, int]]:
-    to_char = _char_offsets(text, raw)
+    to_char = char_offsets(text, raw)
     for m in _PEM.finditer(raw):
         yield to_char(m.start()), to_char(m.end())
 
 
 def _keyword_values(text: str, raw: bytes) -> Iterator[tuple[int, int]]:
     group = _KEYWORD.groupindex[b"wert"]
-    to_char = _char_offsets(text, raw)
+    to_char = char_offsets(text, raw)
     pos = 0
     while (m := _KEYWORD.search(raw, pos)) is not None:
         pos = m.end()

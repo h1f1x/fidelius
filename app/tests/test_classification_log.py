@@ -8,14 +8,20 @@ from fastapi.testclient import TestClient
 
 from fidelius import config
 from fidelius.classification import load_rules
+from fidelius.detectors.base import RawHit
 from fidelius.log_report import report
 from fidelius.main import app
 from fidelius.models import AnalyzeRequest
 from fidelius.pipeline import Pipeline
-from tests.test_classification_analyze import (  # noqa: F401  (Fixtures)
-    PERSON_TEXT, TEXT, VERTRAULICH, ClassifyingLaya, Clock, enabled, person_detector, rules_file,
-)
-from tests.test_log_report import NOW, entry, write_log
+
+from .conftest import NOW, VERTRAULICH, Chunk, FakeClock, FakeLaya, entry, write_log
+
+TEXT = "Die Kantine bietet ab Montag ein neues Menü an."
+PERSON_TEXT = "Herr Emre Yilmaz hat einen Termin in der Kardiologie."
+
+
+def person_detector(text: str) -> list[RawHit]:
+    return [RawHit(5, 16, "Emre Yilmaz", "PERSON", "gliner", "person", 0.9)]
 
 CLASSIFICATION_FIELDS = {"stufe_original", "stufe_anonymisiert", "zugangsdaten", "gewarnt",
                          "klassifikation_ms"}
@@ -33,14 +39,14 @@ def logged(tmp_path, laya, text=TEXT, detectors=(), clock=lambda: 0.0) -> dict:
 
 
 def test_log_holds_both_levels_warning_and_second_pass_duration(enabled, tmp_path):
-    clock = Clock()
+    clock = FakeClock()
 
-    class SlowLaya(ClassifyingLaya):
+    class SlowLaya(FakeLaya):
         def ask(self, text, questions):
             clock.now += 0.25
             return super().ask(text, questions)
 
-    laya = SlowLaya((0, len(PERSON_TEXT), VERTRAULICH), gate_probability=0.9)
+    laya = SlowLaya(chunks=[Chunk(stufe=VERTRAULICH)])
 
     line = logged(tmp_path, laya, PERSON_TEXT, detectors=[person_detector], clock=clock)
 
@@ -50,22 +56,42 @@ def test_log_holds_both_levels_warning_and_second_pass_duration(enabled, tmp_pat
     }
 
 
+def test_unchanged_text_logs_the_original_level_for_both(enabled, tmp_path):
+    """Ohne zweiten Durchlauf gilt die Bewertung des Originals für beide (Spec 4)."""
+    line = logged(tmp_path, FakeLaya(0.1, chunks=[Chunk(stufe=VERTRAULICH)]))
+
+    assert line["stufe_original"] == line["stufe_anonymisiert"] == "vertraulich"
+
+
+def test_failing_second_pass_logs_no_anonymized_level(enabled, tmp_path):
+    laya = FakeLaya(chunks=[Chunk(stufe=VERTRAULICH)], ask_reachable=False)
+
+    line = logged(tmp_path, laya, PERSON_TEXT, detectors=[person_detector])
+
+    assert line["stufe_original"] == "vertraulich"
+    assert line["stufe_anonymisiert"] is None
+    assert line["fehler"] == ("Laya nicht erreichbar (TimeoutError); "
+                              "keine Schutzstufe für den anonymisierten Text.")
+
+
 def test_without_flag_the_fields_are_missing(rules_file, tmp_path):
-    line = logged(tmp_path, ClassifyingLaya())
+    line = logged(tmp_path, FakeLaya(0.1))
 
     assert not CLASSIFICATION_FIELDS & set(line)
 
 
 def test_unreachable_laya_logs_no_level(enabled, tmp_path):
-    line = logged(tmp_path, ClassifyingLaya(reachable=False))
+    line = logged(tmp_path, FakeLaya(0.1, reachable=False))
 
     assert line["stufe_original"] is None
     assert line["stufe_anonymisiert"] is None
     assert line["gewarnt"] is False
+    # Der Ausfall steht einmal im Log, nicht zusätzlich als Hinweis der Klassifikation.
+    assert line["fehler"] == "Laya nicht erreichbar (ConnectionError); Gate übersprungen."
 
 
 def test_log_has_neither_text_nor_probabilities_nor_section_bounds(enabled, tmp_path):
-    laya = ClassifyingLaya((0, len(PERSON_TEXT), VERTRAULICH), gate_probability=0.9)
+    laya = FakeLaya(chunks=[Chunk(stufe=VERTRAULICH)])
 
     line = logged(tmp_path, laya, PERSON_TEXT, detectors=[person_detector])
 
@@ -89,8 +115,8 @@ def test_report_counts_only_entries_with_classification(rules_file, tmp_path):
               entry(),  # älterer Eintrag oder Flag aus
               classified("vertraulich", "oeffentlich", warned=True),
               classified("vertraulich", "intern", warned=True, credentials=True),
-              classified("intern", "intern"),
-              classified("oeffentlich"),
+              classified("intern", "intern"),  # auch: Text unverändert
+              classified("oeffentlich"),  # zweiter Durchlauf fehlgeschlagen
               classified(None))  # Laya nicht erreichbar
 
     c = report(path, "30d", now=NOW, rules=load_rules(rules_file))["classification"]
@@ -109,25 +135,34 @@ def test_report_counts_only_entries_with_classification(rules_file, tmp_path):
     assert c["credentials"] == 1
 
 
-def test_report_with_old_entries_only_has_empty_classification(tmp_path):
+def test_report_with_old_entries_only_has_empty_classification(rules_file, tmp_path):
     path = tmp_path / "requests.jsonl"
     write_log(path, entry(), entry())
 
-    c = report(path, "30d", now=NOW)["classification"]
+    c = report(path, "30d", now=NOW, rules=load_rules(rules_file))["classification"]
 
-    assert c == {"requests": 0, "levels": [], "no_level": 0, "lowered": None,
-                 "lowered_share": None, "warned": 0, "warned_share": None, "credentials": 0}
+    assert c["requests"] == 0
+    assert c["levels"] == [{"level": lv, "name": name, "original": 0, "anonymized": 0}
+                           for lv, name in (("oeffentlich", "Öffentlich"), ("intern", "Intern"),
+                                            ("vertraulich", "Vertraulich"))]
+    assert c["lowered_share"] is None
+    assert c["warned_share"] is None
 
 
-def test_report_without_rules_cannot_tell_lowered(tmp_path):
+def test_report_without_active_rules_has_no_classification(tmp_path):
+    """Flag aus: keine Tabelle, auch wenn ältere Einträge mit Stufen im Zeitraum liegen (Spec 1)."""
     path = tmp_path / "requests.jsonl"
     write_log(path, classified("vertraulich", "oeffentlich"), classified("intern", "intern"))
 
-    c = report(path, "30d", now=NOW)["classification"]
+    assert report(path, "30d", now=NOW)["classification"] is None
 
-    assert [lv["level"] for lv in c["levels"]] == ["vertraulich", "oeffentlich", "intern"]
-    assert c["levels"][0]["name"] == "vertraulich"
-    assert c["lowered"] is None
+
+def test_api_report_without_flag_has_no_classification(rules_file, tmp_path, monkeypatch):
+    path = tmp_path / "requests.jsonl"
+    write_log(path, classified("vertraulich", "oeffentlich", time=datetime.now(UTC).isoformat()))
+    monkeypatch.setattr(config, "REQUEST_LOG", str(path))
+
+    assert TestClient(app).get("/api/report").json()["classification"] is None
 
 
 def test_api_report_orders_levels_by_active_rules(enabled, tmp_path, monkeypatch):

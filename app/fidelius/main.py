@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from . import build_info, classification, config, log_report
 from .calibration import Calibration
 from .detectors import gliner, spacy_det
+from .laya_client import unreachable
 from .models import (AnalyzeRequest, AnalyzeResponse, ApplyRequest, ApplyResponse, ClassifyRequest,
                      TextLevel)
 from .pipeline import LOAD_TEST, REQUEST, Pipeline
@@ -68,13 +69,14 @@ def health() -> dict:
     except Exception as exc:
         laya = f"nicht erreichbar: {exc.__class__.__name__}"
     return {"status": "ok", "laya": laya, "laya_url": config.LAYA_URL,
-            "classification": classification.active_rules()[1]}
+            "classification": classification.status()}
 
 
 @app.get("/api/config")
 def get_config() -> dict:
+    rules = classification.rules()
     return {
-        "categories": classification.categories(classification.active_rules()[0]),
+        "categories": classification.categories(rules),
         "gate_threshold": config.GATE_THRESHOLD,
         "laya_reject_threshold": config.LAYA_REJECT_THRESHOLD,
         "laya_checked_categories": sorted(config.LAYA_CHECKED_CATEGORIES),
@@ -82,13 +84,12 @@ def get_config() -> dict:
         "calibration": calibration.as_dict(),
         "build": build_info.build(),
         "notice": _notice(),
-        "classification": _classification_config(),
+        "classification": _classification_config(rules),
     }
 
 
-def _classification_config() -> dict | None:
+def _classification_config(rules: classification.Rules | None) -> dict | None:
     """Stufen für die Anzeige; die Kurzbeschreibungen für Laya bleiben auf dem Server."""
-    rules, _ = classification.active_rules()
     if rules is None:
         return None
     return {
@@ -162,25 +163,24 @@ def classify(req: ClassifyRequest) -> TextLevel:
 
     Fragt Laya nur nach der Klassifikation, ohne Gate und ohne Eintrag im Request-Log.
     """
-    rules, _ = classification.active_rules()
+    rules = classification.rules()
     if rules is None:
         raise HTTPException(404, "Klassifikation ist nicht aktiv")
     if not req.text.strip():
         raise HTTPException(400, "Leerer Text")
     _check_length(req.text)
     try:
-        sections = pipeline.laya.ask(req.text, classification.questions(rules))
+        return classification.classify_text(pipeline.laya, rules, req.text)
     except Exception as exc:  # noqa: BLE001 - jede Laya-Störung heißt: keine neue Bewertung
-        raise HTTPException(503, f"Laya nicht erreichbar ({exc.__class__.__name__})") from exc
-    return classification.assess(rules, sections)
+        raise HTTPException(503, unreachable(exc)) from exc
 
 
 @app.get("/api/report")
 def get_report(period: str = "30d") -> dict:
     """Fehlt das Log, kommt trotzdem eine Antwort mit log.present = false und dem Pfad."""
     try:
-        rules, _ = classification.active_rules()  # Reihenfolge und Namen der Stufen
-        return log_report.report(config.REQUEST_LOG, period, rules=rules)
+        # Ohne aktive Regeln keine Auswertung der Klassifikation; sonst Reihenfolge und Namen
+        return log_report.report(config.REQUEST_LOG, period, rules=classification.rules())
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
 
