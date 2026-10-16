@@ -73,7 +73,7 @@ def health() -> dict:
 @app.get("/api/config")
 def get_config() -> dict:
     return {
-        "categories": config.CATEGORIES,
+        "categories": classification.categories(classification.active_rules()[0]),
         "gate_threshold": config.GATE_THRESHOLD,
         "laya_reject_threshold": config.LAYA_REJECT_THRESHOLD,
         "laya_checked_categories": sorted(config.LAYA_CHECKED_CATEGORIES),

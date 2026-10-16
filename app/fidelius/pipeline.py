@@ -5,12 +5,14 @@ import logging
 import time
 from collections.abc import Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal, get_args
 
-from . import build_info, config
+from . import build_info, classification, config
 from .detectors.base import RawHit
+from .detectors.credentials import detect_credentials
 from .detectors.gliner import detect_gliner
 from .detectors.regex_det import detect_regex
 from .detectors.spacy_det import detect_spacy
@@ -44,7 +46,10 @@ class Pipeline:
         t0 = self.clock()
         timing = Timing()
         text = req.text
-        allowed = set(req.categories) if req.categories else set(config.CATEGORIES)
+        # Zugangsdaten nur bei aktiver Klassifikation, also Flag an und gültige Regeldatei.
+        rules, _ = classification.active_rules()
+        credentials = rules is not None
+        allowed = set(req.categories) if req.categories else set(classification.categories(rules))
         threshold = req.gate_threshold if req.gate_threshold is not None else config.GATE_THRESHOLD
 
         # 1. Gate
@@ -62,11 +67,18 @@ class Pipeline:
 
         entities: list[Entity] = []
         laya_rejected = 0
+        # Zugangsdaten werden auch ersetzt, wenn das Gate den Text für harmlos hält: Ein Passwort
+        # bleibt ein Passwort, egal wie wenig Personenbezug drumherum steht.
+        cred_hits = detect_credentials(text) if credentials else []
+        if cred_hits and not (sensitive or req.force):
+            entities = merge_hits(cred_hits, text, allowed)
         if sensitive or req.force:
             # 2. Erkennung parallel
             t1 = self.clock()
             futs = [self.pool.submit(detect, text) for detect in self.detectors]
             hits = [h for f in futs for h in f.result()]
+            if credentials:
+                hits = [_as_credential(h) for h in hits] + cred_hits
             # 3. Zusammenführen
             entities = merge_hits(hits, text, allowed)
             timing.detect_ms = self._ms(t1)
@@ -103,6 +115,13 @@ class Pipeline:
 
     def _ms(self, t: float) -> int:
         return int((self.clock() - t) * 1000)
+
+
+def _as_credential(h: RawHit) -> RawHit:
+    """GLiNER-Treffer für Passwort, Secret und API-Key zählen bei aktiver Klassifikation als ZUGANG."""
+    if h.source == "gliner" and h.label in config.ZUGANG_GLINER_LABELS:
+        return replace(h, category=config.ZUGANG)
+    return h
 
 
 def _log_entry(req: AnalyzeRequest, res: AnalyzeResponse, source: Source,

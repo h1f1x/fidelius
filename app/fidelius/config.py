@@ -110,6 +110,13 @@ NOTICE_FILE = os.environ.get("NOTICE_FILE", "/opt/local/hinweise.md")
 # Regeldatei, keine Laya-Fragen, keine Kategorie ZUGANG. Die Regeln liegen wie die Hinweise in local/.
 CLASSIFICATION_ENABLED = os.environ.get("CLASSIFICATION_ENABLED", "0") == "1"
 CLASSIFICATION_FILE = os.environ.get("CLASSIFICATION_FILE", "/opt/local/klassifikation.yaml")
+# Zugangsdaten bilden eine eigene Kategorie, aber nur bei aktiver Klassifikation. Deshalb steht sie
+# nicht in CATEGORIES: Mit Flag aus kennt die UI sie nicht (classification.categories).
+ZUGANG = "ZUGANG"
+ZUGANG_CATEGORY = {"label": "Zugangsdaten", "color": "#b71540"}
+# GLiNER-Labels, die bei aktiver Klassifikation auf ZUGANG statt auf KENNUNG zeigen. ZUGANG steht
+# nicht in LAYA_CHECKED_CATEGORIES: NICHT_SENSIBEL lehnte ein Passwort wie „Sommer2026!“ zu leicht ab.
+ZUGANG_GLINER_LABELS = {"password", "secret", "api_key"}
 # Ab diesem Wert der Laya-Frage nach Zugangsdaten gilt ein Abschnitt als betroffen.
 ZUGANG_THRESHOLD = float(os.environ.get("ZUGANG_THRESHOLD", "0.5"))
 

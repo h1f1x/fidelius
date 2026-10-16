@@ -94,3 +94,10 @@ def active_rules() -> tuple[Rules | None, str]:
     except RulesError as exc:
         return None, f"Fehler: {exc}"
     return rules, f"aktiv: {len(rules.levels)} Stufen"
+
+
+def categories(rules: Rules | None) -> dict[str, dict[str, str]]:
+    """Die Kategorien für Erkennung und UI: mit aktiven Regeln um ZUGANG ergänzt."""
+    if rules is None:
+        return config.CATEGORIES
+    return {**config.CATEGORIES, config.ZUGANG: config.ZUGANG_CATEGORY}
