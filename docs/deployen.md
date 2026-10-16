@@ -58,6 +58,24 @@ Betriebsvereinbarung, liegen auf der VM in `local/hinweise.md` im Deploy-Verzeic
 README). rsync überträgt `local/` nicht und löscht es auch nicht, die Datei überdauert also jeden
 Deploy. Ändert man sie, sehen alle den Splash beim nächsten Aufruf noch einmal.
 
+## Klassifikation einschalten
+
+Die Klassifikation nach Schutzstufen ist aus, bis die Installation sie einschaltet. Die Regeln liegen
+wie die Hinweise in `local/`, als `local/klassifikation.yaml` im Deploy-Verzeichnis (Format im
+README, Abschnitt „Klassifikation“, Vorlage `klassifikation.example.yaml`). Auch diese Datei
+überträgt rsync nicht und löscht sie nicht. Eingeschaltet wird in dieser Reihenfolge:
+
+1. Regeldatei auf die VM nach `local/klassifikation.yaml` hochladen, z. B. mit
+   `scp local/klassifikation.yaml user@vm:fidelius/local/`.
+2. In der `.env` im Deploy-Verzeichnis `CLASSIFICATION_ENABLED=1` setzen.
+3. Den App-Container neu starten, damit er das Flag liest: `make deploy` oder auf der VM
+   `docker compose up -d --wait app`.
+4. `/api/health` prüfen: Das Feld `classification` muss `aktiv: N Stufen` zeigen. Steht dort
+   `Fehler: …`, fehlt die Datei oder ist ungültig; die App läuft dann wie ohne Klassifikation.
+
+Spätere Änderungen an der Regeldatei wirken ohne Neustart. Zum Ausschalten `CLASSIFICATION_ENABLED`
+aus der `.env` nehmen oder auf `0` setzen und den Container neu starten.
+
 ## Auf der VM nachsehen
 
 `make remote-login` öffnet eine Shell auf der VM im Deploy-Verzeichnis, mit denselben Variablen
