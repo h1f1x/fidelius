@@ -135,25 +135,34 @@ def test_report_counts_only_entries_with_classification(rules_file, tmp_path):
     assert c["credentials"] == 1
 
 
-def test_report_with_old_entries_only_has_empty_classification(tmp_path):
+def test_report_with_old_entries_only_has_empty_classification(rules_file, tmp_path):
     path = tmp_path / "requests.jsonl"
     write_log(path, entry(), entry())
 
-    c = report(path, "30d", now=NOW)["classification"]
+    c = report(path, "30d", now=NOW, rules=load_rules(rules_file))["classification"]
 
-    assert c == {"requests": 0, "levels": [], "no_level": 0, "lowered": None,
-                 "lowered_share": None, "warned": 0, "warned_share": None, "credentials": 0}
+    assert c["requests"] == 0
+    assert c["levels"] == [{"level": lv, "name": name, "original": 0, "anonymized": 0}
+                           for lv, name in (("oeffentlich", "Öffentlich"), ("intern", "Intern"),
+                                            ("vertraulich", "Vertraulich"))]
+    assert c["lowered_share"] is None
+    assert c["warned_share"] is None
 
 
-def test_report_without_rules_cannot_tell_lowered(tmp_path):
+def test_report_without_active_rules_has_no_classification(tmp_path):
+    """Flag aus: keine Tabelle, auch wenn ältere Einträge mit Stufen im Zeitraum liegen (Spec 1)."""
     path = tmp_path / "requests.jsonl"
     write_log(path, classified("vertraulich", "oeffentlich"), classified("intern", "intern"))
 
-    c = report(path, "30d", now=NOW)["classification"]
+    assert report(path, "30d", now=NOW)["classification"] is None
 
-    assert [lv["level"] for lv in c["levels"]] == ["vertraulich", "oeffentlich", "intern"]
-    assert c["levels"][0]["name"] == "vertraulich"
-    assert c["lowered"] is None
+
+def test_api_report_without_flag_has_no_classification(rules_file, tmp_path, monkeypatch):
+    path = tmp_path / "requests.jsonl"
+    write_log(path, classified("vertraulich", "oeffentlich", time=datetime.now(UTC).isoformat()))
+    monkeypatch.setattr(config, "REQUEST_LOG", str(path))
+
+    assert TestClient(app).get("/api/report").json()["classification"] is None
 
 
 def test_api_report_orders_levels_by_active_rules(enabled, tmp_path, monkeypatch):
