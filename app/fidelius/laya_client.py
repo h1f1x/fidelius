@@ -166,10 +166,6 @@ def _context(text: str, e: Entity, window: int = 300) -> str:
     return text[start:end].strip()
 
 
-def _chunk(text: str, size: int) -> list[str]:
-    return [s.body for s in _sections(text, size)]
-
-
 def _sections(text: str, size: int) -> list[Section]:
     """Absätze zu Abschnitten von höchstens `size` Zeichen; überlange Absätze werden geteilt.
 

@@ -4,13 +4,13 @@ from unittest.mock import patch
 import httpx
 
 from fidelius import config
-from fidelius.laya_client import LayaClient, _chunk, _context, _verdict
+from fidelius.laya_client import LayaClient, _context, _sections, _verdict
 from fidelius.models import Entity, Source
 
 
 def test_chunk_respects_paragraphs():
     text = "\n\n".join(["a" * 250, "b" * 250, "c" * 250])
-    chunks = _chunk(text, 520)
+    chunks = [s.body for s in _sections(text, 520)]
     assert len(chunks) == 2
     assert chunks[0].startswith("a") and chunks[1].startswith("c")
 
