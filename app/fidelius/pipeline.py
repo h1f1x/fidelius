@@ -104,10 +104,16 @@ class Pipeline:
                         for e in entities]
         # 5. Platzhalter
         entities = assign_placeholders(entities)
+        anonymized_text = anonymize(text, entities)
+        # 6. Schutzstufe des anonymisierten Texts, nur wenn er sich vom Original unterscheidet
+        if classified and classified.original and anonymized_text != text:
+            t3 = self.clock()
+            classified = self._classify_anonymized(rules, classified, anonymized_text)
+            timing.classification_ms = self._ms(t3)
         timing.total_ms = self._ms(t0)
         res = AnalyzeResponse(
             text=text, gate=gate, entities=entities,
-            anonymized_text=anonymize(text, entities),
+            anonymized_text=anonymized_text,
             mapping=build_mapping(entities), timing=timing, classification=classified,
         )
         if self.request_log:
@@ -117,6 +123,23 @@ class Pipeline:
     def apply(self, text: str, entities: list[Entity]):
         entities = assign_placeholders(entities)
         return entities, anonymize(text, entities), build_mapping(entities)
+
+    def _classify_anonymized(self, rules: classification.Rules, classified: Classification,
+                             anonymized_text: str) -> Classification:
+        """Zweiter Laya-Durchlauf nur mit den Klassifikationsfragen; ergänzt `anonymized`.
+
+        Fällt Laya hier aus, bleibt die Bewertung des Originals stehen und ein Hinweis kommt dazu.
+        """
+        anonymized, note = None, classified.note
+        try:
+            sections = self.laya.ask(anonymized_text, classification.questions(rules))
+            anonymized = classification.assess(rules, sections)
+        except Exception as exc:
+            log.warning("Laya-Klassifikation des anonymisierten Texts fehlgeschlagen: %s", exc)
+            note = (f"Laya nicht erreichbar ({exc.__class__.__name__}); "
+                    "keine Schutzstufe für den anonymisierten Text.")
+        return classification.summarize(rules, classified.original, anonymized,
+                                        credentials=classified.credentials, note=note)
 
     def _ms(self, t: float) -> int:
         return int((self.clock() - t) * 1000)

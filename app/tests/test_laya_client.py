@@ -88,3 +88,18 @@ def test_extra_questions_run_in_the_gate_batch_and_come_back_per_section():
                                                                "Zweiter Absatz ohne."]
     assert [s.answers["zugang"]["noul"] for s in result.sections] == [0.9, 0.05]
     assert result.sections[0].answers["stufe"]["probabilities"] == {"A": 0.2, "B": 0.8}
+
+
+def test_ask_sends_only_the_given_questions_on_gate_sections():
+    """Zweiter Durchlauf der Klassifikation: dieselben Abschnitte, aber keine Gate-Fragen."""
+    text = "Erster Absatz mit [PERSON_1].\n\nZweiter Absatz ohne."
+    stufe = {"type": "choice", "instructions": "Welche Stufe?", "criteria": {"A": "a", "B": "b"}}
+    laya, requests = fake_laya(lambda k, body: {"type": "choice", "choice": "A",
+                                                "probabilities": {"A": 0.7, "B": 0.3}})
+    with patch.object(config, "GATE_CHUNK_CHARS", 30):
+        sections = laya.ask(text, {"stufe": stufe})
+
+    assert [r["questions"] for r in requests] == [{"stufe": stufe}]
+    assert [text[s.start:s.end] for s in sections] == ["Erster Absatz mit [PERSON_1].",
+                                                       "Zweiter Absatz ohne."]
+    assert [s.answers["stufe"]["probabilities"]["A"] for s in sections] == [0.7, 0.7]

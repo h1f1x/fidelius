@@ -60,7 +60,16 @@ class LayaClient:
         if clash:
             raise ValueError(f"Zusatzfragen überschreiben Gate-Fragen: {sorted(clash)}")
         gate_questions = {k: {"type": "noul", "instructions": v} for k, v in config.GATE_QUESTIONS.items()}
-        questions = {**gate_questions, **extra}
+        sections = self.ask(text, {**gate_questions, **extra})
+        best = max((float(s.answers[k]["noul"]) for s in sections for k in gate_questions), default=0.0)
+        return GateResult(probability=best, sections=sections)
+
+    def ask(self, text: str, questions: dict[str, dict]) -> list[Section]:
+        """Stellt nur `questions` auf denselben Abschnitten wie das Gate, ohne Gate-Fragen.
+
+        Für den zweiten Durchlauf der Klassifikation auf dem anonymisierten Text: Dort ist der
+        Gate-Wert ohne Belang, die Abschnitte sollen aber genauso geschnitten sein wie beim Original.
+        """
         sections = _sections(text, config.GATE_CHUNK_CHARS)
         for batch in _batches(sections, 16):
             r = self.client.post("/v1/systemone/batch", json={
@@ -71,8 +80,7 @@ class LayaClient:
             r.raise_for_status()
             for section, res in zip(batch, r.json()["results"]):
                 section.answers = res["answers"]
-        best = max((float(s.answers[k]["noul"]) for s in sections for k in gate_questions), default=0.0)
-        return GateResult(probability=best, sections=sections)
+        return sections
 
     # ---- Treffer-Bestätigung ------------------------------------------------------------
     def classify(self, text: str, entities: list[Entity]) -> list[Entity]:

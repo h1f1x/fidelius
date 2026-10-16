@@ -58,6 +58,8 @@ class Timing(BaseModel):
     gate_ms: int = 0
     detect_ms: int = 0
     laya_check_ms: int = 0
+    # Zweiter Laya-Durchlauf auf dem anonymisierten Text; das Original steckt in gate_ms.
+    classification_ms: int = 0
     total_ms: int = 0
 
 
