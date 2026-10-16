@@ -210,3 +210,4 @@ svg.chart .ref { stroke: var(--mark); stroke-dasharray: 3 3; }
 .classwarn { margin: 8px 0; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border); border-left: 4px solid var(--danger); font-size: 13px; }
 .classwarn p, .classwarn ul, .classwarn ol { margin: 6px 0 0; }
 .classwarn h3, .classwarn h4 { margin: 6px 0 0; font-size: 13px; }
+.classwarn > div + div { margin-top: 10px; }

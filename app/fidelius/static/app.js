@@ -317,7 +317,11 @@
     const badge = c.anonymized ? `Original: ${chip(c.original)} → Anonymisiert: ${chip(c.anonymized)}` : chip(c.original);
     // Maßgeblich ist der Text, der in die KI geht: der anonymisierte, solange es keine eigene Bewertung gibt das Original.
     const rule = level((c.anonymized || c.original).level).text;
-    const banner = c.warn ? `<div class="classwarn" role="alert"><strong>Die Schutzstufe liegt über der Freigabe für KI-Systeme. Es gilt:</strong>${rule ? markdown(rule) : ""}</div>` : "";
+    const over = [c.original, c.anonymized].some((t) => t && rank(t.level) > rank(rules.freigegeben_bis));
+    const levelPart = over ? `<div><strong>Die Schutzstufe liegt über der Freigabe für KI-Systeme. Es gilt:</strong>${rule ? markdown(rule) : ""}</div>` : "";
+    // Bleibt stehen, auch wenn alle Zugangsdaten ersetzt sind: Ein Secret in der Zwischenablage gilt als offengelegt.
+    const credPart = c.credentials ? `<div><strong>Im Original stehen Zugangsdaten. Auch wenn sie ersetzt sind, sollten sie als offengelegt gelten und ausgetauscht werden.</strong>${markdown(rules.zugangsdaten_text || "Zugangsdaten gehören nicht in KI-Systeme.")}</div>` : "";
+    const banner = c.warn ? `<div class="classwarn" role="alert">${levelPart}${credPart}</div>` : "";
     return `<div class="classbadge">Schutzstufe: ${badge}</div>${banner}`;
   }
 
