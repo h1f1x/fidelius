@@ -164,6 +164,22 @@ ihr Wert steht je Abschnitt in `classification.original.chunks[].credentials`. D
 Austauschen, auch wenn alle Zugangsdaten ersetzt sind: Ein Secret, das einmal in einer
 Zwischenablage lag, gilt als offengelegt. Darunter steht `zugangsdaten.text` aus der Regeldatei.
 
+Wie treffsicher die Regeln sind, prüft `make classification-examples` gegen die laufende App. Es
+schickt die Texte aus `examples/klassifikation/` an `/api/classify` und vergleicht mit der
+`expected.json` daneben (erwartete Stufe und ob Zugangsdaten drinstehen). Die Beispiele passen zur
+`klassifikation.example.yaml` und tauchen in der Beispielauswahl der UI nicht auf.
+
+```bash
+make classification-examples                                        # examples/klassifikation
+make classification-examples ARGS="--dir local/klassifikation-beispiele"  # eigene Regeln
+make classification-examples ARGS="--zugang-threshold 0.4"          # andere Zugangsdaten-Schwelle
+```
+
+Ausgabe: je Text Soll- und Ist-Stufe und der höchste `zugang`-Wert, dann die Konfusionsmatrix
+(Zeilen Soll, Spalten Ist) und die Trefferquote für Zugangsdaten. Das Skript zählt Zugangsdaten
+nur über die Laya-Frage `zugang`, nicht über die Regex-Muster, und wendet `--zugang-threshold`
+selbst an; die Stufe kommt mit der `schwelle` der Regeldatei aus der App.
+
 ## Bedienung
 
 Die Oberfläche ist für Nutzer ohne technisches Vorwissen gedacht. Ein Klick auf „Wie funktioniert

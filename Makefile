@@ -17,12 +17,12 @@ WAIT_TIMEOUT ?= 1800
 # httpx2 bleibt auf demselben Pin wie in app/pyproject.toml, die Begründung steht dort.
 TEST_DEPS := --with pydantic --with httpx --with httpx2==2.10.0 --with fastapi --with pytest --with google-re2 --with pyyaml
 
-.PHONY: help init up down logs status test examples loadtest loadtest-report deploy remote-login \
+.PHONY: help init up down logs status test examples classification-examples loadtest loadtest-report deploy remote-login \
         _tools-Darwin _tools-Linux _runtime-Darwin _runtime-Linux _start-Darwin _start-Linux \
         _compose _memory
 
 help: ## Diese Übersicht
-	@grep -E '^[a-z][a-z-]*:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-15s %s\n", $$1, $$2}'
+	@grep -E '^[a-z][a-z-]*:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  make %-24s %s\n", $$1, $$2}'
 
 init: _tools-$(OS) _runtime-$(OS) _compose _memory ## Tools prüfen und fehlende installieren, Runtime starten
 	@echo "Fertig. Weiter mit: make up"
@@ -48,6 +48,11 @@ examples: ## Beispielmails gegen die laufende App prüfen, z. B. make examples A
 	@curl -fsS -o /dev/null http://localhost:$(APP_PORT)/api/health \
 	  || { echo "App antwortet nicht auf Port $(APP_PORT). Erst: make up"; exit 1; }
 	uv run --no-project --python 3.12 scripts/run_examples.py --url http://localhost:$(APP_PORT) $(ARGS)
+
+classification-examples: ## Schutzstufen gegen die laufende App prüfen, z. B. ARGS="--dir local/klassifikation-beispiele"
+	@curl -fsS -o /dev/null http://localhost:$(APP_PORT)/api/health \
+	  || { echo "App antwortet nicht auf Port $(APP_PORT). Erst: make up"; exit 1; }
+	uv run --no-project --python 3.12 scripts/run_classification.py --url http://localhost:$(APP_PORT) $(ARGS)
 
 # Ohne --url in ARGS geht der Test per SSH-Tunnel an die VM, mit denselben Variablen wie deploy.
 loadtest: ## Lasttest, Ergebnis in loadtest-results/, z. B. make loadtest ARGS="--label 16gb"

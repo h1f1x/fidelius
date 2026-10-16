@@ -125,6 +125,7 @@ und installiert keine zweite. Den Speicher regelt in diesem Fall *Settings → R
 | `make status` | `docker compose ps` |
 | `make test` | Unit-Tests ohne Modelle, in einer temporären Umgebung über `uv` |
 | `make examples` | Beispielmails gegen die laufende App, Argumente über `ARGS="-q 05"` |
+| `make classification-examples` | Schutzstufen der Kalibrierbeispiele gegen die laufende App (Klassifikation an), Argumente über `ARGS="--dir local/klassifikation-beispiele"` |
 | `make loadtest` | Lasttest gegen die Dev-VM per SSH-Tunnel, mit `ARGS="--url http://localhost:8080 --stages 1,2 --min-duration 20 --min-requests 3"` als kurzer Rauchlauf gegen `make up`; Ergebnis in `loadtest-results/` |
 | `make loadtest-report` | HTML-Bericht über die Läufe in `loadtest-results/bericht.html`, Optionen über `ARGS="--runs … --target … --request-log …"` |
 

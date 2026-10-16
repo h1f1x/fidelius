@@ -166,6 +166,8 @@ Alles in diesem Abschnitt gilt nur bei Flag an und gültiger Regeldatei.
 - `scripts/run_classification.py` schickt die Texte eines Verzeichnisses an `/api/classify` und vergleicht mit der `expected.json` daneben. Ausgabe: Konfusionsmatrix der Stufen und Trefferquote für Zugangsdaten.
 - Make-Ziel `make classification-examples ARGS="--dir examples/klassifikation"`. Mit `--dir local/klassifikation-beispiele` misst eine Installation ihre eigenen Regeln.
 - Damit werden `schwelle`, `ZUGANG_THRESHOLD` und die `laya`-Kurzfassungen der Beispieldatei festgelegt, bevor die Funktion ausgerollt wird.
+- Umgesetzt: 16 Beispiele, je Stufe drei aus Versicherung, Arztpraxis und Kanzlei, dazu vier mit Zugangsdaten (drei vertraulich, ein internes Rundschreiben mit Gäste-WLAN-Passwort). Das Skript zählt Zugangsdaten nur über `zugang`, weil `/api/classify` die Regex-Muster nicht anwendet, und nimmt die Schwelle als `--zugang-threshold`, damit sie sich ohne Neustart erproben lässt.
+- **Messung steht noch aus.** Bis dahin gelten die Startwerte `schwelle: 0.3` und `ZUGANG_THRESHOLD=0.5`, die Kurzfassungen sind unverändert. Gemessene Werte und gewählte Schwellen kommen hierher.
 
 ## 10. Doku
 
