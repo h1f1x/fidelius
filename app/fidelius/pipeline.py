@@ -16,7 +16,7 @@ from .detectors.credentials import detect_credentials
 from .detectors.gliner import detect_gliner
 from .detectors.regex_det import detect_regex
 from .detectors.spacy_det import detect_spacy
-from .laya_client import GateResult, LayaClient
+from .laya_client import GateResult, LayaClient, unreachable
 from .merge import merge_hits
 from .models import AnalyzeRequest, AnalyzeResponse, Classification, Entity, Gate, Timing
 from .placeholders import anonymize, assign_placeholders, build_mapping
@@ -47,7 +47,7 @@ class Pipeline:
         timing = Timing()
         text = req.text
         # Zugangsdaten nur bei aktiver Klassifikation, also Flag an und gültige Regeldatei.
-        rules, _ = classification.active_rules()
+        rules = classification.rules()
         credentials = rules is not None
         allowed = set(req.categories) if req.categories else set(classification.categories(rules))
         threshold = req.gate_threshold if req.gate_threshold is not None else config.GATE_THRESHOLD
@@ -55,39 +55,37 @@ class Pipeline:
         # 1. Gate, bei aktiver Klassifikation mit deren Fragen im selben Batch
         gate_note = None
         prob: float | None = None
-        result, laya_error = None, None
+        result: GateResult | None = None
+        laya_error: Exception | None = None
         try:
             result = (self.laya.gate(text, extra=classification.questions(rules)) if rules
                       else self.laya.gate(text))
             prob = result.probability
         except Exception as exc:  # Laya nicht erreichbar: Erkennung trotzdem erlauben
             log.warning("Laya-Gate fehlgeschlagen: %s", exc)
-            laya_error = exc.__class__.__name__
-            gate_note = f"Laya nicht erreichbar ({exc.__class__.__name__}); Gate übersprungen."
+            laya_error = exc
+            gate_note = f"{unreachable(exc)}; Gate übersprungen."
         timing.gate_ms = self._ms(t0)
         sensitive = prob is None or prob >= threshold
         gate = Gate(probability=prob, threshold=threshold, sensitive=sensitive,
                     skipped=req.force, note=gate_note)
 
-        entities: list[Entity] = []
         laya_rejected = 0
         # Zugangsdaten werden auch ersetzt, wenn das Gate den Text für harmlos hält: Ein Passwort
         # bleibt ein Passwort, egal wie wenig Personenbezug drumherum steht.
-        cred_hits = detect_credentials(text) if credentials else []
-        # Für die Warnung zählt jeder ZUGANG-Treffer, auch einer, den die Kategorienwahl ausfiltert.
-        credentials_found = bool(cred_hits)
-        if cred_hits and not (sensitive or req.force):
-            entities = merge_hits(cred_hits, text, allowed)
-        if sensitive or req.force:
+        hits = detect_credentials(text) if credentials else []
+        detect = sensitive or req.force
+        t1 = self.clock()
+        if detect:
             # 2. Erkennung parallel
-            t1 = self.clock()
-            futs = [self.pool.submit(detect, text) for detect in self.detectors]
-            hits = [h for f in futs for h in f.result()]
-            if credentials:
-                hits = [_as_credential(h) for h in hits] + cred_hits
-                credentials_found = any(h.category == config.ZUGANG for h in hits)
-            # 3. Zusammenführen
-            entities = merge_hits(hits, text, allowed)
+            futs = [self.pool.submit(detector, text) for detector in self.detectors]
+            found = [h for f in futs for h in f.result()]
+            hits = ([_as_credential(h) for h in found] if credentials else found) + hits
+        # Für die Warnung zählt jeder ZUGANG-Treffer, auch einer, den die Kategorienwahl ausfiltert.
+        credentials_found = any(h.category == config.ZUGANG for h in hits)
+        # 3. Zusammenführen
+        entities = merge_hits(hits, text, allowed)
+        if detect:
             timing.detect_ms = self._ms(t1)
             # 4. Laya-Bestätigung
             if req.use_laya_check and gate_note is None:
@@ -138,12 +136,10 @@ class Pipeline:
         """
         anonymized, note = None, classified.note
         try:
-            sections = self.laya.ask(anonymized_text, classification.questions(rules))
-            anonymized = classification.assess(rules, sections)
+            anonymized = classification.classify_text(self.laya, rules, anonymized_text)
         except Exception as exc:
             log.warning("Laya-Klassifikation des anonymisierten Texts fehlgeschlagen: %s", exc)
-            note = (f"Laya nicht erreichbar ({exc.__class__.__name__}); "
-                    "keine Schutzstufe für den anonymisierten Text.")
+            note = f"{unreachable(exc)}; keine Schutzstufe für den anonymisierten Text."
         return classification.summarize(rules, classified.original, anonymized,
                                         credentials=classified.credentials, note=note)
 
@@ -159,7 +155,7 @@ def _as_credential(h: RawHit) -> RawHit:
 
 
 def _classify_original(rules: classification.Rules, result: GateResult | None,
-                       laya_error: str | None, credentials: bool) -> Classification:
+                       laya_error: Exception | None, credentials: bool) -> Classification:
     """Stufe des Originals aus dem Gate-Batch; ohne Laya-Antwort nur ein Hinweis.
 
     Zugangsdaten stehen im Original, wenn ein ZUGANG-Treffer gefunden wurde (`credentials`)
@@ -168,7 +164,7 @@ def _classify_original(rules: classification.Rules, result: GateResult | None,
     if result is None:
         return classification.summarize(
             rules, None, credentials=credentials,
-            note=f"Laya nicht erreichbar ({laya_error}); keine Schutzstufe.")
+            note=f"{unreachable(laya_error)}; keine Schutzstufe.")
     original = classification.assess(rules, result.sections)
     credentials = credentials or classification.credentials_likely(original)
     return classification.summarize(rules, original, credentials=credentials)

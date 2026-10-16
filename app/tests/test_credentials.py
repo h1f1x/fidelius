@@ -123,9 +123,9 @@ def test_flag_on_finds_credentials_even_if_gate_says_harmless(monkeypatch, tmp_p
 
 def test_categories_include_zugang_only_when_active(monkeypatch, tmp_path):
     _rules_on(monkeypatch, tmp_path, False)
-    assert "ZUGANG" not in classification.categories(classification.active_rules()[0])
+    assert "ZUGANG" not in classification.categories(classification.rules())
     _rules_on(monkeypatch, tmp_path, True)
-    assert "ZUGANG" in classification.categories(classification.active_rules()[0])
+    assert "ZUGANG" in classification.categories(classification.rules())
 
 
 # ---- UI und Laya ---------------------------------------------------------------------

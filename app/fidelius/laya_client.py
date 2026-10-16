@@ -15,6 +15,11 @@ _SENT_SPLIT = re.compile(r"(?<=[.!?\n])\s+")
 _PARA_SPLIT = re.compile(r"\n\s*\n")
 
 
+def unreachable(exc: BaseException) -> str:
+    """Hinweis, wenn eine Laya-Anfrage scheitert; Gate, Klassifikation und /api/classify teilen ihn."""
+    return f"Laya nicht erreichbar ({exc.__class__.__name__})"
+
+
 @dataclass
 class Section:
     """Ein Abschnitt des Texts, wie ihn das Gate an Laya schickt, mit Laya-Antworten je Frage.

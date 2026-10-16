@@ -13,7 +13,7 @@ from . import config
 from .models import ChunkLevel, Classification, Span, TextLevel
 
 if TYPE_CHECKING:
-    from .laya_client import Section
+    from .laya_client import LayaClient, Section
 
 # Startwert, bis die Kalibrierbeispiele einen besseren liefern (docs/specs/klassifikation.md).
 DEFAULT_THRESHOLD = 0.3
@@ -119,18 +119,28 @@ def _parse(data: object, lines: _Lines) -> Rules:
     return Rules(tuple(levels), approved, float(threshold), creds_text or None)
 
 
-def active_rules() -> tuple[Rules | None, str]:
-    """Die Regeln, falls Flag an und Datei gültig, dazu der Status für /api/health.
+def rules() -> Rules | None:
+    """Die Regeln, falls Flag an und Datei gültig, sonst None (Klassifikation aus).
 
-    Liest die Datei bei jedem Aufruf, damit eine Änderung ohne Neustart wirkt.
+    Liest die Datei bei jedem Aufruf, damit eine Änderung ohne Neustart wirkt; je Anfrage
+    deshalb nur einmal aufrufen und das Ergebnis weiterreichen.
     """
+    return _active()[0]
+
+
+def status() -> str:
+    """Zustand für /api/health: aus, aktiv mit Zahl der Stufen oder Fehler mit Zeile."""
+    return _active()[1]
+
+
+def _active() -> tuple[Rules | None, str]:
     if not config.CLASSIFICATION_ENABLED:
         return None, "aus"
     try:
-        rules = load_rules(config.CLASSIFICATION_FILE)
+        loaded = load_rules(config.CLASSIFICATION_FILE)
     except RulesError as exc:
         return None, f"Fehler: {exc}"
-    return rules, f"aktiv: {len(rules.levels)} Stufen"
+    return loaded, f"aktiv: {len(loaded.levels)} Stufen"
 
 
 def categories(rules: Rules | None) -> dict[str, dict[str, str]]:
@@ -163,6 +173,12 @@ def questions(rules: Rules) -> dict[str, dict]:
         },
         CREDENTIALS_QUESTION: {"type": "noul", "instructions": CREDENTIALS_INSTRUCTIONS},
     }
+
+
+def classify_text(laya: LayaClient, rules: Rules, text: str) -> TextLevel:
+    """Eigener Laya-Durchlauf nur mit den Klassifikationsfragen, ohne Gate: für den
+    anonymisierten Text und für „neu bewerten“. Laya-Fehler gehen an den Aufrufer."""
+    return assess(rules, laya.ask(text, questions(rules)))
 
 
 def assess(rules: Rules, sections: Sequence[Section]) -> TextLevel:

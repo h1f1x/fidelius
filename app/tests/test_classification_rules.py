@@ -84,30 +84,29 @@ def test_example_file_in_repo_is_valid():
 def test_active_rules_off_without_flag(monkeypatch, tmp_path):
     monkeypatch.setattr(config, "CLASSIFICATION_ENABLED", False)
     monkeypatch.setattr(config, "CLASSIFICATION_FILE", _write(tmp_path, RULES))
-    assert classification.active_rules() == (None, "aus")
+    assert classification.rules() is None
+    assert classification.status() == "aus"
 
 
 def test_active_rules_with_flag_and_valid_file(enabled, monkeypatch, tmp_path):
     monkeypatch.setattr(config, "CLASSIFICATION_FILE", _write(tmp_path, RULES))
-    rules, status = classification.active_rules()
-    assert rules is not None
-    assert status == "aktiv: 3 Stufen"
+    assert classification.rules() is not None
+    assert classification.status() == "aktiv: 3 Stufen"
 
 
 def test_active_rules_with_flag_but_missing_file(enabled, monkeypatch, tmp_path):
     path = str(tmp_path / "fehlt.yaml")
     monkeypatch.setattr(config, "CLASSIFICATION_FILE", path)
-    rules, status = classification.active_rules()
-    assert rules is None
-    assert status == f"Fehler: Regeldatei fehlt ({path})"
+    assert classification.rules() is None
+    assert classification.status() == f"Fehler: Regeldatei fehlt ({path})"
 
 
 def test_rules_file_is_read_on_every_call(enabled, monkeypatch, tmp_path):
     path = _write(tmp_path, RULES)
     monkeypatch.setattr(config, "CLASSIFICATION_FILE", path)
-    assert classification.active_rules()[1] == "aktiv: 3 Stufen"
+    assert len(classification.rules().levels) == 3
     _write(tmp_path, RULES.split("  - id: vertraulich")[0])
-    assert classification.active_rules()[1] == "aktiv: 2 Stufen"
+    assert len(classification.rules().levels) == 2
 
 
 # ---- /api/health und /api/config ------------------------------------------------------
