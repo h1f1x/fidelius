@@ -161,6 +161,22 @@
       ${errors.map((e) => `<tr><td>${esc(e.text)}</td>${numCell(integer(e.count))}<td>${esc(dateTime(e.last))}</td></tr>`).join("")}</tbody></table>`
     : empty("Keine Fehler im Zeitraum.");
 
+  // Zählt nur Anfragen mit Klassifikation; ältere Einträge und solche mit Flag aus fehlen hier.
+  // Ist die Klassifikation aus, liefert /api/report null und die Kachel entfällt (Spec 1).
+  function classificationTable(c) {
+    const rows = c.levels.map((lv) => `<tr><td>${esc(lv.name)}</td>${numCell(integer(lv.original))}${numCell(integer(lv.anonymized))}</tr>`).join("");
+    const noLevel = c.no_level ? `<tr><td class="muted">ohne Stufe (Laya nicht erreichbar)</td>${numCell(integer(c.no_level))}<td></td></tr>` : "";
+    const lowered = `${integer(c.lowered)} (${percent(c.lowered_share)})`;
+    return `<table><thead><tr><th>Stufe</th><th class="num">Original</th><th class="num">anonymisiert</th></tr></thead>
+      <tbody>${rows}${noLevel}</tbody></table>
+      <table><tbody>
+        <tr><td>Stufe durch Anonymisierung gesenkt</td>${numCell(lowered)}</tr>
+        <tr><td>gewarnt</td>${numCell(`${integer(c.warned)} (${percent(c.warned_share)})`)}</tr>
+        <tr><td>davon Zugangsdaten gefunden</td>${numCell(integer(c.credentials))}</tr>
+      </tbody></table>
+      <p class="hint">${integer(c.requests)} Anfragen mit Klassifikation. „Gesenkt“ bezieht sich auf Anfragen mit beiden Stufen; bei unverändertem Text gilt die Stufe des Originals für beide.</p>`;
+  }
+
   // ---------- Seite ----------
   const periodPicker = () => `<span class="seg">${PERIODS.map(([key, label]) =>
     `<button data-period="${key}" class="${key === period ? "on" : ""}">${label}</button>`).join("")}</span>`;
@@ -209,6 +225,7 @@
         ${tile("Builds", buildTable(data.builds), true)}
         ${tile(`Kalibrierung <span class="muted">· ${integer(calibrationRuns)} Läufe</span>`, calibrationTable(data.calibration))}
         ${tile("Fehler", errorTable(data.errors))}
+        ${data.classification?.requests ? tile("Schutzstufe", classificationTable(data.classification)) : ""}
       </div>`;
   }
 

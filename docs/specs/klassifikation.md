@@ -1,6 +1,6 @@
 # Spec: Klassifikation nach Schutzstufen
 
-Stand: 2026-10-15, Ergebnis einer Klärungsrunde. Alle Punkte sind entschieden, umgesetzt ist noch nichts. Entscheidung: [ADR-0001](../adr/0001-klassifikation-warnt-je-installation.md). Issue: noch nicht angelegt.
+Stand: 2026-10-16. Alle Punkte sind entschieden und umgesetzt (#8–#16), Abweichungen stehen in den Abschnitten. Offen ist die Messung der Treffsicherheit (#17, Abschnitt 9). Entscheidung: [ADR-0001](../adr/0001-klassifikation-warnt-je-installation.md). Issue: [#7](https://github.com/h1f1x/fidelius/issues/7).
 
 ## Ziel
 
@@ -47,7 +47,7 @@ Stand: 2026-10-15, Ergebnis einer Klärungsrunde. Alle Punkte sind entschieden, 
 ```yaml
 # Stufen von niedrig nach hoch. Die Reihenfolge ist die Rangfolge.
 freigegeben_bis: intern        # id der höchsten Stufe, die ohne Warnung durchgeht
-schwelle: 0.3                  # siehe Abschnitt 4
+schwelle: 0.4                  # siehe Abschnitt 4
 stufen:
   - id: oeffentlich
     name: Öffentlich
@@ -96,9 +96,9 @@ zugangsdaten:
   - `zugang`: `noul` mit „Enthält dieser Text ein Passwort, einen Token, einen API-Key, einen privaten Schlüssel oder andere Zugangsdaten?“
   - Ob Laya `noul` und `choice` in einem Batch mischt, ist vor der Umsetzung zu prüfen. Wenn nicht, wird es ein zweiter Batch auf denselben Abschnitten.
 - **Anonymisierter Text:** Nach den Platzhaltern wird der anonymisierte Text auf dieselbe Weise klassifiziert, ein zweiter Laya-Durchlauf. Ist er gleich dem Original (Gate harmlos, keine Treffer), entfällt der Durchlauf und die Bewertung des Originals gilt für beide.
-- **Stufe je Abschnitt:** Die höchste Stufe, deren Wahrscheinlichkeit mindestens `schwelle` beträgt. Erreicht keine Stufe die Schwelle, gilt die wahrscheinlichste. Bei einem Fehlalarm kostet eine Warnung wenig, ein übersehener vertraulicher Text kostet viel. Die Schwelle startet bei 0,3 und wird mit den Kalibrierbeispielen festgelegt.
+- **Stufe je Abschnitt:** Die höchste Stufe, deren Wahrscheinlichkeit mindestens `schwelle` beträgt. Erreicht keine Stufe die Schwelle, gilt die wahrscheinlichste. Bei einem Fehlalarm kostet eine Warnung wenig, ein übersehener vertraulicher Text kostet viel. Die Schwelle steht nach der Kalibrierung auf 0,4 (Abschnitt 9).
 - **Stufe des Texts:** die höchste Stufe über alle Abschnitte. Der Abschnitt, der sie ausgelöst hat, wird mit Start und Ende im Text mitgeliefert.
-- **Zugangsdaten im Text:** ja, wenn ein Treffer der Kategorie ZUGANG gefunden wurde (Abschnitt 5) oder `zugang` in einem Abschnitt den Wert `ZUGANG_THRESHOLD` erreicht (Env, Standard 0,5, wird mitkalibriert).
+- **Zugangsdaten im Text:** ja, wenn ein Treffer der Kategorie ZUGANG gefunden wurde (Abschnitt 5) oder `zugang` in einem Abschnitt den Wert `ZUGANG_THRESHOLD` erreicht (Env, Standard 0,9, kalibriert in Abschnitt 9).
 - **Warnung:** ja, wenn die Stufe des Originals oder des anonymisierten Texts über `freigegeben_bis` liegt oder Zugangsdaten im Original gefunden wurden.
 - **Laya nicht erreichbar:** wie beim Gate. Die App antwortet mit 200, die Klassifikation ist leer, ein Hinweis steht in `classification.note` und im Log-Feld `fehler`.
 
@@ -106,15 +106,15 @@ zugangsdaten:
 
 Alles in diesem Abschnitt gilt nur bei Flag an und gültiger Regeldatei.
 
-- Neue Kategorie `ZUGANG` in `config.CATEGORIES` mit eigener Farbe, Platzhalter `[ZUGANG_1]`.
+- Neue Kategorie `ZUGANG` mit eigener Farbe, Platzhalter `[ZUGANG_1]`. Umgesetzt steht sie nicht fest in `config.CATEGORIES`, sondern `classification.categories(rules)` fügt sie nur bei aktiven Regeln hinzu. So ist sie bei Flag aus oder ungültiger Datei auch in `/api/config` und der Kategorienwahl nicht da.
 - Neue Regex-Muster im Regex-Erkenner, alle in RE2-Syntax:
   - privater Schlüssel im PEM-Format (`-----BEGIN … PRIVATE KEY-----` bis zum passenden END)
   - bekannte Token-Präfixe: `sk-`, `sk-ant-`, `ghp_`, `gho_`, `github_pat_`, `xoxb-`, `xoxp-`, `AKIA` mit 16 Zeichen, `glpat-`
   - JWT (`eyJ…\.eyJ…\.…`)
-  - Schlüsselwort plus Wert: `passwort`, `password`, `pwd`, `kennwort`, `token`, `api_key`, `apikey`, `secret`, `client_secret`, gefolgt von `:` oder `=` und einem Wert ohne Leerzeichen
+  - Schlüsselwort plus Wert: `passwort`, `password`, `passwd`, `pwd`, `kennwort`, `token`, `api_key`, `apikey`, `secret`, `client_secret`, gefolgt von `:` oder `=` und einem Wert ohne Leerzeichen. Ein Präfix wie in `DB_PASSWORD` oder `app-secret` gehört zum Schlüsselwort. Ersetzt wird nur der Wert, und nur, wenn er eine Ziffer oder ein Sonderzeichen enthält: „Das Passwort: bekommst du per Telefon“ ist Fließtext. Ein Wert nur aus Buchstaben fängt allein die Laya-Frage `zugang` (entschieden bei der Umsetzung).
 - GLiNER-Labels `password`, `secret` und `api_key` zeigen künftig auf `ZUGANG` statt auf `KENNUNG`.
 - Regex-Treffer für ZUGANG fragt Laya nicht nach, wie alle Regex-Treffer. GLiNER-Treffer für ZUGANG werden nicht bestätigt, weil `NICHT_SENSIBEL` ein Passwort wie „Sommer2026!“ zu leicht ablehnt: ZUGANG kommt nicht in `LAYA_CHECKED_CATEGORIES`.
-- Die Warnung bleibt auch dann stehen, wenn alle Zugangsdaten ersetzt sind: „Im Original stehen Zugangsdaten. Sie sind ersetzt, sollten aber als offengelegt gelten und ausgetauscht werden.“ Ein Secret, das einmal in einer Zwischenablage lag, gilt als kompromittiert.
+- Die Warnung bleibt auch dann stehen, wenn alle Zugangsdaten ersetzt sind: „Im Original stehen Zugangsdaten. Auch wenn sie ersetzt sind, sollten sie als offengelegt gelten und ausgetauscht werden.“ Ein Secret, das einmal in einer Zwischenablage lag, gilt als kompromittiert. Der Wortlaut sagt nicht „Sie sind ersetzt“, weil das nicht immer stimmt: Bei abgewählter Kategorie ZUGANG oder wenn nur die Laya-Frage `zugang` angeschlagen hat, steht das Secret noch im Text.
 
 ## 6. Schnittstelle
 
@@ -135,8 +135,8 @@ Alles in diesem Abschnitt gilt nur bei Flag an und gültiger Regeldatei.
   `anonymized` ist `null`, wenn der Text unverändert blieb. Die Abschnitte von `anonymized` beziehen sich auf den anonymisierten Text.
 - **`POST /api/classify`** mit `{"text": "…"}` liefert ein einzelnes Objekt wie `original` oben. Die UI ruft es für „neu bewerten“ mit dem aktuellen anonymisierten Text auf. Es gelten dieselben Grenzen wie bei `/api/analyze` (Textlänge, Body).
 - **`/api/apply`** bleibt ohne Modellaufruf.
-- **`/api/config`** liefert `classification` mit `levels` (`id`, `name`, `text`), `freigegeben_bis` und `zugangsdaten_text`, ohne die `laya`-Kurzfassungen. Bei Flag aus, fehlender oder ungültiger Datei: `null`.
-- **`/api/classify`** antwortet bei Flag aus oder ohne gültige Regeldatei mit 404.
+- **`/api/config`** liefert `classification` mit `levels` (`id`, `name`, `text`), `freigegeben_bis`, `schwelle` (für die Expertenansicht) und `zugangsdaten_text`, ohne die `laya`-Kurzfassungen. Bei Flag aus, fehlender oder ungültiger Datei: `null`.
+- **`/api/classify`** antwortet bei Flag aus oder ohne gültige Regeldatei mit 404, bei leerem Text mit 400 wie `/api/analyze`. Ist Laya nicht erreichbar, antwortet es mit 503 und „Laya nicht erreichbar (…)“, denn ohne Laya gibt es keine neue Bewertung; die UI lässt die alte dann als veraltet stehen.
 - **`/api/health`** liefert `classification`: `"aus"` (Flag aus), `"aktiv: 4 Stufen"` oder `"Fehler: <Meldung mit Zeile>"` (Flag an, Datei fehlt oder ist ungültig).
 
 ## 7. UI
@@ -166,6 +166,48 @@ Alles in diesem Abschnitt gilt nur bei Flag an und gültiger Regeldatei.
 - `scripts/run_classification.py` schickt die Texte eines Verzeichnisses an `/api/classify` und vergleicht mit der `expected.json` daneben. Ausgabe: Konfusionsmatrix der Stufen und Trefferquote für Zugangsdaten.
 - Make-Ziel `make classification-examples ARGS="--dir examples/klassifikation"`. Mit `--dir local/klassifikation-beispiele` misst eine Installation ihre eigenen Regeln.
 - Damit werden `schwelle`, `ZUGANG_THRESHOLD` und die `laya`-Kurzfassungen der Beispieldatei festgelegt, bevor die Funktion ausgerollt wird.
+- Umgesetzt: 16 Beispiele, je Stufe drei aus Versicherung, Arztpraxis und Kanzlei, dazu vier mit Zugangsdaten (drei vertraulich, ein internes Rundschreiben mit Gäste-WLAN-Passwort). Das Skript zählt Zugangsdaten nur über `zugang`, weil `/api/classify` die Regex-Muster nicht anwendet, und nimmt die Schwelle als `--zugang-threshold`, damit sie sich ohne Neustart erproben lässt.
+
+### Messung (16. Oktober 2026)
+
+Laya `multilingual` (Revision 7b928d8) auf CPU, `examples/klassifikation` gegen `klassifikation.example.yaml`. Laya antwortet bei gleichem Text und gleichen Kriterien deterministisch; Abweichungen zwischen den Läufen kommen nur aus den geänderten Kurzfassungen. Zeilen Soll, Spalten Ist.
+
+**Startwerte** (`schwelle: 0.3`, bisherige Kurzfassungen, `ZUGANG_THRESHOLD=0.5`): Stufen 5/16 richtig.
+
+| Soll \ Ist | oeffentlich | intern | vertraulich | streng_vertraulich |
+|---|---|---|---|---|
+| oeffentlich | 0 | 0 | 0 | 3 |
+| intern | 0 | 2 | 0 | 2 |
+| vertraulich | 0 | 4 | 0 | 2 |
+| streng_vertraulich | 0 | 0 | 0 | 3 |
+
+Zugangsdaten ab 0,5: 4/4 erkannt, 4 Fehlalarme bei 12 Texten ohne Zugangsdaten (02 Webseite, 05 Rundschreiben, 07 Schadenakte, 10 Leistungsfall).
+
+**Gewählte Werte** (`schwelle: 0.4`, neue Kurzfassungen, `ZUGANG_THRESHOLD=0.9`): Stufen 12/16 richtig.
+
+| Soll \ Ist | oeffentlich | intern | vertraulich | streng_vertraulich |
+|---|---|---|---|---|
+| oeffentlich | 2 | 0 | 0 | 1 |
+| intern | 0 | 3 | 1 | 0 |
+| vertraulich | 0 | 1 | 4 | 1 |
+| streng_vertraulich | 0 | 0 | 0 | 3 |
+
+Zugangsdaten ab 0,9: 4/4 erkannt, 2 Fehlalarme (02 Webseite mit 0,99, 07 Schadenakte mit 0,92).
+
+Verlauf:
+
+- Mit den alten Kurzfassungen hilft keine `schwelle`: Zwischen 0,15 und 0,6 bleiben es 4 bis 6 von 16. `vertraulich` gewinnt keinen einzigen Abschnitt (höchstens 0,32), dafür reißen einzelne Abschnitte öffentliche Texte auf `streng_vertraulich` („Impfungen, EKG“ auf der Praxis-Webseite) und vertrauliche fallen auf `intern`. Die Kurzfassungen sind der Hebel, nicht die Schwelle.
+- Fünf Runden mit neuen Kurzfassungen. Was wirkt: `streng_vertraulich` an eine bestimmte Person binden („Diagnose, Befund oder Krankheit einer bestimmten Person“) statt an das Wort Gesundheitsdaten; damit kippen Webseite und Rundschreiben nicht mehr. `intern` und `vertraulich` über den Empfängerkreis trennen („für alle Mitarbeitenden“ gegen „nur für wenige Beteiligte“); erst damit wählt Laya `vertraulich` überhaupt. Aufzählungen nach Datenart allein („Daten einzelner Kunden, Finanzzahlen …“) ließen `vertraulich` bei 1 bis 2 von 6.
+- `schwelle` mit den neuen Kurzfassungen: 0,25 ergibt 7/16, 0,3 ergibt 9/16, von 0,35 bis 0,6 durchgehend 12/16. Unter 0,35 heben Nebenstufen mit 0,30 bis 0,33 öffentliche und interne Texte an. Gewählt ist 0,4: im flachen Bereich, mit Abstand zur Kante bei 0,3, und so niedrig wie möglich, damit eine deutlich vertretene höhere Stufe noch gewinnt.
+- `zugang`: Die vier Texte mit Zugangsdaten liegen bei 0,98 bis 1,00, die übrigen streuen bis 0,99 (02, Webseite mit Online-Formular). Eine saubere Trennung gibt es nicht. 0,9 halbiert die Fehlalarme gegenüber 0,5 und lässt 0,08 Abstand zum schwächsten Treffer (16, Gäste-WLAN). 0,95 hätte einen Fehlalarm weniger, läge aber nur 0,03 unter diesem Treffer; bei Zugangsdaten wiegt ein übersehener Fall schwerer als eine Warnung zu viel. In der App greifen zusätzlich die Regex-Muster (Abschnitt 5), die das Skript nicht misst.
+
+Verbleibende Fehler und ihre Folge bei `freigegeben_bis: intern`:
+
+- 13 Ticket mit Zugangsdaten, Soll `vertraulich`, Ist `intern`: Die Stufe warnt nicht, die Zugangsdaten-Warnung schon. Kein Text über der Freigabe bleibt ganz ohne Warnung.
+- 01 Pressemitteilung auf `streng_vertraulich`, 06 Statistik auf `vertraulich`: Warnung zu viel. Beide hängen an je einem Abschnitt (Einleitung der Pressemitteilung 0,49, Kanzleistatistik 0,70).
+- 08 Praxisfinanzen auf `streng_vertraulich` statt `vertraulich`: Warnung kommt, nur eine Stufe zu hoch.
+
+Grenzen: 16 Beispiele sind wenig, die Zahlen zeigen Tendenzen, keine Quoten für den Betrieb. Die neue Kurzfassung für `vertraulich` nennt Quellcode und Sicherheitsinformation (Schwachstelle, Netzwerkplan) nicht mehr, weil keine Beispiele dafür vorliegen und die kürzeren Fassungen besser trennten; eine Installation mit solchen Texten ergänzt sie und misst mit eigenen Beispielen nach.
 
 ## 10. Doku
 

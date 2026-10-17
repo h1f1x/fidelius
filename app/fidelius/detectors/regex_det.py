@@ -34,17 +34,18 @@ def _not_word(also: str = "") -> str:
 
 # 2. RE2 kennt keine Lookarounds, und sein \b ist ebenfalls ASCII. Ein Rand wird deshalb als
 #    Zeichen mitgematcht: davor Textanfang oder ein Nicht-Wortzeichen, dahinter Textende oder ein
-#    Nicht-Wortzeichen. Der eigentliche Treffer liegt in der Gruppe „treffer“, _spans liest ihn aus.
+#    Nicht-Wortzeichen. Der eigentliche Treffer liegt in der Gruppe „treffer“, spans liest ihn aus.
 _BEFORE_WORD = "(?:^|" + _not_word() + ")"
 _AFTER_WORD = "(?:$|" + _not_word() + ")"
 
 
-def _bounded(body: str, before: str = _BEFORE_WORD, after: str = _AFTER_WORD):
-    # Kompiliert für Bytes, damit detect_regex den Text nur einmal kodiert (siehe _spans).
+# bounded, spans und char_offsets nutzt auch detectors/credentials.py für die Zugangsdaten.
+def bounded(body: str, before: str = _BEFORE_WORD, after: str = _AFTER_WORD):
+    # Kompiliert für Bytes, damit detect_regex den Text nur einmal kodiert (siehe spans).
     return re2.compile(_unicode(before + "(?P<treffer>" + body + ")" + after).encode())
 
 
-def _char_offsets(text: str, raw: bytes) -> Callable[[int], int]:
+def char_offsets(text: str, raw: bytes) -> Callable[[int], int]:
     """Rechnet Byte-Offsets in raw in Zeichen-Offsets in text um; aufsteigend in linearer Zeit."""
     if len(raw) == len(text):
         return lambda b: b
@@ -61,7 +62,7 @@ def _char_offsets(text: str, raw: bytes) -> Callable[[int], int]:
     return convert
 
 
-def _spans(pattern, text: str, raw: bytes) -> Iterator[tuple[int, int]]:
+def spans(pattern, text: str, raw: bytes) -> Iterator[tuple[int, int]]:
     """Spannen der Gruppe „treffer“ in Zeichen-Offsets, in der Reihenfolge von Pythons finditer.
 
     Der Rand hinter einem Treffer kann der Rand vor dem nächsten sein („030 1234567,040 7654321“).
@@ -70,7 +71,7 @@ def _spans(pattern, text: str, raw: bytes) -> Iterator[tuple[int, int]]:
     Text neu, und viele Treffer machten die Laufzeit quadratisch.
     """
     group = pattern.groupindex[b"treffer"]
-    to_char = _char_offsets(text, raw)
+    to_char = char_offsets(text, raw)
     pos = 0
     while (m := pattern.search(raw, pos)) is not None:
         s, e = m.span(group)
@@ -85,20 +86,20 @@ _EMAIL = re2.compile(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}")
 # mit Ziffer; sonst läse sich das Datum „12.10.2026“ als Nummer. Die öffnende Klammer vor einer
 # Vorwahl wie „(030)“ holt _phone_start nach.
 _PHONE_SEP = f"[{_SPACE_CHARS}\\-/]"
-_PHONE = _bounded(
+_PHONE = bounded(
     r"(?:\+49|0049|\(0\)|0)" + _PHONE_SEP + r"?\(?\d{2,5}\)?" + _PHONE_SEP + r"?\d{2,}"
     r"(?:" + _PHONE_SEP + r"?\d{1,})*",
     before="(?:^|" + _not_word(".") + ")",
     after="(?:$|" + _not_word(".") + r"|\.(?:$|\D))",
 )
 
-_IBAN = _bounded(r"[A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]{4}){2,7}(?:[ ]?[A-Z0-9]{1,4})?")
+_IBAN = bounded(r"[A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]{4}){2,7}(?:[ ]?[A-Z0-9]{1,4})?")
 
 _MONTHS = (
     "Januar|Februar|März|Maerz|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember|"
     "Jan\\.|Feb\\.|Mär\\.|Apr\\.|Jun\\.|Jul\\.|Aug\\.|Sep\\.|Sept\\.|Okt\\.|Nov\\.|Dez\\."
 )
-_DATE = _bounded(
+_DATE = bounded(
     r"(?:"
     r"\d{1,2}\.\s?\d{1,2}\.\s?(?:\d{4}|\d{2})"            # 03.05.2026, 3.5.26
     r"|\d{1,2}\.\s?(?:" + _MONTHS + r")\s?\d{4}"            # 3. Mai 2026
@@ -109,7 +110,7 @@ _DATE = _bounded(
 
 # Endet auf Hausnummer, optional mit Buchstabe: „Musterstraße 12a“, „Weg 3 b“. Den Fall, dass
 # ein Leerzeichen dahinter zum Treffer gehört, ergänzt _street_end.
-_STREET = _bounded(
+_STREET = bounded(
     r"[A-ZÄÖÜ][" + _WORD_CHARS + r".\-]*(?:[ -][A-ZÄÖÜ][" + _WORD_CHARS + r".\-]*)*"
     r"(?:straße|strasse|str\.|Straße|Strasse|Str\.|weg|Weg|allee|Allee|platz|Platz|gasse|Gasse|"
     r"ring|Ring|damm|Damm|ufer|Ufer|chaussee|Chaussee)\s+\d+(?:\s?[a-zA-Z])?"
@@ -126,12 +127,12 @@ _ID_KEYWORD = re2.compile(_unicode(
     r"(?P<id>[A-Z]{0,4}[\-/ ]?\d[A-Z0-9\-/]*(?: [A-Z0-9][A-Z0-9\-/]*){0,5})"
 ))
 # Alleinstehende Kennungen mit Buchstabenpräfix: VS-2024-001234, KD/889911, SN2026-0042
-_ID_PREFIXED = _bounded(r"[A-Z]{2,4}[\-/]?\d{2,}(?:[\-/][A-Z0-9]{2,}){0,4}")
+_ID_PREFIXED = bounded(r"[A-Z]{2,4}[\-/]?\d{2,}(?:[\-/][A-Z0-9]{2,}){0,4}")
 # Deutsche Steuer-ID (11 Ziffern) und Sozialversicherungsnummer (12 345678 A 123)
-_TAX_ID = _bounded(r"\d{2}\s?\d{3}\s?\d{3}\s?\d{3}")
-_SVNR = _bounded(r"\d{2}\s?\d{6}\s?[A-Z]\s?\d{3}")
+_TAX_ID = bounded(r"\d{2}\s?\d{3}\s?\d{3}\s?\d{3}")
+_SVNR = bounded(r"\d{2}\s?\d{6}\s?[A-Z]\s?\d{3}")
 # Kfz-Kennzeichen: B-AB 1234, M-XY 12, HH-AB 123E
-_PLATE = _bounded(r"[A-ZÄÖÜ]{1,3}-[A-Z]{1,2}\s?\d{1,4}[EH]?")
+_PLATE = bounded(r"[A-ZÄÖÜ]{1,3}-[A-Z]{1,2}\s?\d{1,4}[EH]?")
 
 
 def _iban_valid(s: str) -> bool:
@@ -181,9 +182,9 @@ def _phone_start(text: str, s: int, e: int) -> int:
     return s
 
 
-def _merged(spans: list[tuple[int, int]]) -> list[tuple[int, int]]:
+def _merged(ranges: list[tuple[int, int]]) -> list[tuple[int, int]]:
     merged: list[tuple[int, int]] = []
-    for s, e in sorted(spans):
+    for s, e in sorted(ranges):
         if merged and s <= merged[-1][1]:
             merged[-1] = (merged[-1][0], max(merged[-1][1], e))
         else:
@@ -200,12 +201,12 @@ def detect_regex(text: str) -> list[RawHit]:
 
     for m in _EMAIL.finditer(text):
         add(m.start(), m.end(), "EMAIL", "email")
-    for s, e in _spans(_IBAN, text, raw):
+    for s, e in spans(_IBAN, text, raw):
         if _iban_valid(text[s:e]):
             add(s, e, "IBAN", "iban")
-    for s, e in _spans(_DATE, text, raw):
+    for s, e in spans(_DATE, text, raw):
         add(s, e, "DATUM", "date")
-    for s, e in _spans(_STREET, text, raw):
+    for s, e in spans(_STREET, text, raw):
         add(s, _street_end(text, e), "ADRESSE", "street")
     id_group = _ID_KEYWORD.groupindex["id"]  # RE2-Treffer kennen Gruppen nur per Nummer.
     for m in _ID_KEYWORD.finditer(text):
@@ -214,20 +215,20 @@ def detect_regex(text: str) -> list[RawHit]:
             e -= 1
         if e - s >= 4 and any(ch.isdigit() for ch in text[s:e]):
             add(s, e, "KENNUNG", "id_keyword")
-    for s, e in _spans(_ID_PREFIXED, text, raw):
+    for s, e in spans(_ID_PREFIXED, text, raw):
         add(s, e, "KENNUNG", "id_prefixed")
-    for s, e in _spans(_TAX_ID, text, raw):
+    for s, e in spans(_TAX_ID, text, raw):
         add(s, e, "KENNUNG", "tax_id")
-    for s, e in _spans(_SVNR, text, raw):
+    for s, e in spans(_SVNR, text, raw):
         add(s, e, "KENNUNG", "svnr")
-    for s, e in _spans(_PLATE, text, raw):
+    for s, e in spans(_PLATE, text, raw):
         add(s, e, "KENNUNG", "plate")
     # Telefon zuletzt, damit Daten/IBAN/Kennungen, die wie Nummern aussehen, Vorrang haben. Die
     # belegten Bereiche liegen zusammengefasst und sortiert vor, damit jeder Kandidat per Binärsuche
     # statt gegen alle Treffer geprüft wird.
     taken = _merged([(h.start, h.end) for h in hits])
     taken_ends = [te for _, te in taken]
-    for s, e in _spans(_PHONE, text, raw):
+    for s, e in spans(_PHONE, text, raw):
         if not _phone_valid(text[s:e]):
             continue
         s = _phone_start(text, s, e)

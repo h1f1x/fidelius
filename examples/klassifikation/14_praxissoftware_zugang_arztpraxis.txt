@@ -1,0 +1,18 @@
+Übergabe für die Vertretung in der Praxis, 26. bis 30. Oktober
+
+Hallo Lisa,
+
+danke, dass du nächste Woche den Empfang übernimmst. Hier das Wichtigste:
+
+Praxissoftware: Anmeldung am Empfangsrechner mit dem Benutzer „empfang2“, Kennwort: Lavendel#8841. Damit siehst du Terminkalender und Wartezimmer, aber keine Befunde.
+
+Telematikinfrastruktur: Wenn der Konnektor nach einem Neustart die Karte nicht liest, bitte die PIN der Praxiskarte (SMC-B) eingeben, sie lautet 482915. Danach das Kartenterminal kurz aus- und wieder einschalten.
+
+Faxserver für Laborbefunde: Weboberfläche unter http://fax.praxis.local, Login admin, Passwort: Labor2026!Fax
+
+Rezepte für Dauermedikation druckst du nur nach Freigabe durch eine Ärztin aus. Die Liste der Patientinnen und Patienten mit Dauerrezept liegt in der Ablage unter „Rezepte“.
+
+Bei Problemen erreichst du mich auf dem Handy.
+
+Viele Grüße
+Nadine

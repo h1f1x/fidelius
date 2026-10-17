@@ -80,6 +80,106 @@ Zur betrieblichen Nutzung bei **Schraubenhuber & Co. KG** beachtet bitte auch di
 `make deploy` überträgt `local/` nicht und löscht es auf der VM auch nicht. Dort legt man die Datei
 einmal selbst ab, z. B. nach `make remote-login`.
 
+## Klassifikation
+
+Fidelius kann einschätzen, welcher Schutzstufe ein Text nach den Regeln der Installation angehört,
+und warnen, wenn eine Stufe über der Freigabe liegt. Es sperrt nichts. Die Funktion ist aus, bis
+eine Installation sie mit `CLASSIFICATION_ENABLED=1` einschaltet; ausgeschaltet verhält sich
+Fidelius wie ohne sie und liest die Regeldatei nicht. Hintergrund:
+[docs/specs/klassifikation.md](docs/specs/klassifikation.md) und
+[ADR-0001](docs/adr/0001-klassifikation-warnt-je-installation.md).
+
+Die Schutzstufen einer Organisation gehören nicht ins Repo, sondern nach `local/klassifikation.yaml`
+(im Container `/opt/local/klassifikation.yaml`, änderbar mit `CLASSIFICATION_FILE`). Als Vorlage
+dient [klassifikation.example.yaml](klassifikation.example.yaml) mit vier generischen Stufen:
+
+```bash
+mkdir -p local && cp klassifikation.example.yaml local/klassifikation.yaml
+```
+
+```yaml
+freigegeben_bis: intern   # id der höchsten Stufe, die ohne Warnung durchgeht
+schwelle: 0.4             # optional; eine Stufe zählt ab dieser Wahrscheinlichkeit
+stufen:                   # von niedrig nach hoch, die Reihenfolge ist die Rangfolge
+  - id: oeffentlich
+    name: Öffentlich
+    laya: Veröffentlichte Information wie Pressemitteilung, Webseite oder Gesetzestext
+    text: |
+      **Definition:** …
+      **KI-Nutzung:** …
+  - id: intern
+    …
+zugangsdaten:             # optional
+  text: Passwörter, Tokens und API-Keys dürfen nie in ein KI-System.
+```
+
+- `id`, `name`, `laya` und `text` sind je Stufe Pflicht, die `id` muss eindeutig sein. Es braucht
+  mindestens zwei Stufen, und auch die unterste definiert die Installation selbst.
+- `laya` ist die Kurzbeschreibung, nach der das Modell die Stufe wählt: ein bis zwei Zeilen mit
+  konkreten Beispielen. Sie bleibt auf dem Server, `/api/config` liefert sie nicht aus.
+- `text` ist Markdown für die Anzeige, etwa Definition und Regel für die KI-Nutzung.
+- `zugangsdaten.text` erscheint bei einer Warnung wegen Zugangsdaten; fehlt er, steht dort ein
+  generischer Satz.
+- `schwelle` bestimmt die Stufe eines Abschnitts von 600 Zeichen: die höchste Stufe mit mindestens
+  dieser Wahrscheinlichkeit, sonst die wahrscheinlichste. Der Text bekommt die höchste Stufe über
+  alle Abschnitte. Die Fragen dafür laufen im selben Laya-Batch wie das Gate, auch wenn das Gate
+  den Text als harmlos einstuft.
+
+Nach der Analyse zeigt die UI die Stufe als Badge über dem Ergebnis, bis `freigegeben_bis` neutral,
+darüber in Warnfarbe und mit einem Banner, das den `text` der Stufe zeigt. `/api/analyze` liefert
+dazu das Feld `classification` (Format in der Spec, Abschnitt 6); ist Laya nicht erreichbar, steht
+dort nur ein Hinweis in `note`.
+
+Korrekturen an den Treffern rufen kein Modell auf; danach steht am Badge „veraltet“. Der Button
+„neu bewerten“ schickt den aktuellen anonymisierten Text an `POST /api/classify` und ersetzt die
+Bewertung des anonymisierten Texts. Der Endpunkt antwortet bei Flag aus oder ungültiger Datei mit
+404 und schreibt nichts ins Request-Log.
+
+Die App liest die Datei bei jedem Aufruf neu, eine Änderung wirkt ohne Neustart. Das Flag dagegen
+wirkt erst nach einem Neustart des Containers. `/api/health` zeigt im Feld `classification`, woran
+man ist:
+
+| Meldung | Bedeutung |
+|---|---|
+| `aus` | `CLASSIFICATION_ENABLED` ist nicht `1` |
+| `aktiv: 4 Stufen` | Flag an, Regeldatei gültig |
+| `Fehler: Regeldatei fehlt (…)` | Flag an, aber keine Datei unter dem Pfad |
+| `Fehler: Zeile 7: …` | Flag an, Datei ungültig (YAML-Fehler, zu wenige Stufen, Stufe ohne Pflichtfeld, doppelte `id`, unbekanntes `freigegeben_bis`, `schwelle` außerhalb 0 bis 1); die Zeile zeigt auf die Stelle |
+
+Fehlt die Datei oder ist sie ungültig, läuft alles wie bei Flag aus, nur `/api/health` meldet den
+Fehler, damit eine vergessene Datei auffällt.
+
+Bei aktiver Klassifikation ersetzt Fidelius außerdem Zugangsdaten durch `[ZUGANG_1]` usw., auch
+wenn das Gate den Text für harmlos hält: bekannte Token-Formate (`sk-`, `ghp_`, `github_pat_`,
+`glpat-`, `xoxb-`, `AKIA…`), JWTs, private Schlüssel im PEM-Format über alle Zeilen und Werte hinter
+Schlüsselwörtern wie `Passwort:` oder `api_key=`. Beim Schlüsselwort wird nur der Wert ersetzt, und
+nur, wenn er eine Ziffer oder ein Sonderzeichen enthält; „Das Passwort: bekommst du per Telefon“
+bleibt stehen. GLiNER-Treffer für Passwort, Secret und API-Key zählen dann ebenfalls zu ZUGANG
+statt zu KENNUNG. Laya bestätigt ZUGANG-Treffer nicht nach.
+
+Zugangsdaten im Original lösen die Warnung aus, unabhängig von der Stufe: wenn ein ZUGANG-Treffer
+gefunden wurde (auch wenn die Kategorie abgewählt ist) oder wenn Laya in einem Abschnitt auf die
+Frage `zugang` mindestens `ZUGANG_THRESHOLD` antwortet. Die Frage läuft im selben Batch wie das Gate,
+ihr Wert steht je Abschnitt in `classification.original.chunks[].credentials`. Das Banner rät zum
+Austauschen, auch wenn alle Zugangsdaten ersetzt sind: Ein Secret, das einmal in einer
+Zwischenablage lag, gilt als offengelegt. Darunter steht `zugangsdaten.text` aus der Regeldatei.
+
+Wie treffsicher die Regeln sind, prüft `make classification-examples` gegen die laufende App. Es
+schickt die Texte aus `examples/klassifikation/` an `/api/classify` und vergleicht mit der
+`expected.json` daneben (erwartete Stufe und ob Zugangsdaten drinstehen). Die Beispiele passen zur
+`klassifikation.example.yaml` und tauchen in der Beispielauswahl der UI nicht auf.
+
+```bash
+make classification-examples                                        # examples/klassifikation
+make classification-examples ARGS="--dir local/klassifikation-beispiele"  # eigene Regeln
+make classification-examples ARGS="--zugang-threshold 0.8"          # andere Zugangsdaten-Schwelle
+```
+
+Ausgabe: je Text Soll- und Ist-Stufe und der höchste `zugang`-Wert, dann die Konfusionsmatrix
+(Zeilen Soll, Spalten Ist) und die Trefferquote für Zugangsdaten. Das Skript zählt Zugangsdaten
+nur über die Laya-Frage `zugang`, nicht über die Regex-Muster, und wendet `--zugang-threshold`
+selbst an; die Stufe kommt mit der `schwelle` der Regeldatei aus der App.
+
 ## Bedienung
 
 Die Oberfläche ist für Nutzer ohne technisches Vorwissen gedacht. Ein Klick auf „Wie funktioniert
@@ -185,6 +285,9 @@ App protokolliert, gelten dort als wesentliche Änderung und gehen vorher an den
 | `OMP_NUM_THREADS` | 4 | CPU-Threads je Container |
 | `MAX_TEXT_CHARS` | 50000 | Höchstlänge eines Textes je Anfrage, längere lehnt die App ab |
 | `NOTICE_FILE` | /opt/local/hinweise.md | Pfad im Container für die Hinweise dieser Installation im Splash-Screen; `./local` ist dorthin gemountet |
+| `CLASSIFICATION_ENABLED` | 0 | `1` schaltet die Klassifikation an (siehe Klassifikation), wirkt nach Neustart des Containers |
+| `CLASSIFICATION_FILE` | /opt/local/klassifikation.yaml | Pfad im Container für die Klassifikationsregeln dieser Installation |
+| `ZUGANG_THRESHOLD` | 0.9 | Laya-Wert der Frage `zugang` in einem Abschnitt, ab dem die Klassifikation vor Zugangsdaten warnt |
 | `REQUEST_LOG` | /var/log/fidelius/requests.jsonl | Pfad im Container für das Request-Log (eine JSON-Zeile je Prüfung, ohne Text); nur unter `/var/log/fidelius` liegt es auf dem Volume `request-log` |
 
 Kategorien, Farben, Label-Zuordnungen und die Laya-Fragen stehen in `app/fidelius/config.py`.

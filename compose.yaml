@@ -52,6 +52,9 @@ services:
       GLINER_THRESHOLD: "${GLINER_THRESHOLD:-0.5}"
       MAX_TEXT_CHARS: "${MAX_TEXT_CHARS:-50000}"
       REQUEST_LOG: "${REQUEST_LOG:-/var/log/fidelius/requests.jsonl}"
+      # Klassifikation nach Schutzstufen, braucht local/klassifikation.yaml (README, „Klassifikation“).
+      CLASSIFICATION_ENABLED: "${CLASSIFICATION_ENABLED:-0}"
+      ZUGANG_THRESHOLD: "${ZUGANG_THRESHOLD:-0.9}"
       OMP_NUM_THREADS: "${OMP_NUM_THREADS:-4}"
       HF_HUB_OFFLINE: "1"
     ports:

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import re
+from dataclasses import dataclass, field
 
 import httpx
 
@@ -11,12 +12,39 @@ from .models import Entity, LayaVerdict
 
 log = logging.getLogger(__name__)
 _SENT_SPLIT = re.compile(r"(?<=[.!?\n])\s+")
+_PARA_SPLIT = re.compile(r"\n\s*\n")
+
+
+def unreachable(exc: BaseException) -> str:
+    """Hinweis, wenn eine Laya-Anfrage scheitert; Gate, Klassifikation und /api/classify teilen ihn."""
+    return f"Laya nicht erreichbar ({exc.__class__.__name__})"
+
+
+@dataclass
+class Section:
+    """Ein Abschnitt des Texts, wie ihn das Gate an Laya schickt, mit Laya-Antworten je Frage.
+
+    `start`/`end` sind Positionen im Originaltext. `answers` enthält die Rohantworten von Laya
+    unter dem Schlüssel der Frage, also z. B. `{"noul": 0.8, ...}` oder
+    `{"choice": "B", "probabilities": {...}, ...}`.
+    """
+    start: int
+    end: int
+    body: str
+    answers: dict[str, dict] = field(default_factory=dict)
+
+
+@dataclass
+class GateResult:
+    probability: float  # Höchstwert der Gate-Fragen über alle Abschnitte
+    sections: list[Section] = field(default_factory=list)
 
 
 class LayaClient:
-    def __init__(self, base_url: str = config.LAYA_URL, timeout: float = config.LAYA_TIMEOUT):
+    def __init__(self, base_url: str = config.LAYA_URL, timeout: float = config.LAYA_TIMEOUT,
+                 transport: httpx.BaseTransport | None = None):
         self.base_url = base_url
-        self.client = httpx.Client(base_url=base_url, timeout=timeout)
+        self.client = httpx.Client(base_url=base_url, timeout=timeout, transport=transport)
 
     def health(self) -> dict:
         r = self.client.get("/health")
@@ -24,22 +52,40 @@ class LayaClient:
         return r.json()
 
     # ---- Gate -------------------------------------------------------------------------
-    def gate(self, text: str) -> float:
-        """Maximale Wahrscheinlichkeit über alle Abschnitte des Texts."""
-        chunks = _chunk(text, config.GATE_CHUNK_CHARS)
-        questions = {k: {"type": "noul", "instructions": v} for k, v in config.GATE_QUESTIONS.items()}
-        best = 0.0
-        for batch in _batches(chunks, 16):
+    def gate(self, text: str, extra: dict[str, dict] | None = None) -> GateResult:
+        """Bewertet den Text abschnittsweise mit den Gate-Fragen.
+
+        `extra` sind weitere Laya-Fragen im Format des Batch-Endpunkts (`{"type": "noul" |
+        "choice", "instructions": ..., "criteria": ...}`). Sie laufen im selben Batch auf
+        denselben Abschnitten mit und zählen nicht zum Gate-Wert. Laya mischt `noul` und
+        `choice` in einem Batch, die Gate-Werte bleiben dabei gleich (geprüft in #9).
+        """
+        extra = extra or {}
+        clash = set(extra) & set(config.GATE_QUESTIONS)
+        if clash:
+            raise ValueError(f"Zusatzfragen überschreiben Gate-Fragen: {sorted(clash)}")
+        gate_questions = {k: {"type": "noul", "instructions": v} for k, v in config.GATE_QUESTIONS.items()}
+        sections = self.ask(text, {**gate_questions, **extra})
+        best = max((float(s.answers[k]["noul"]) for s in sections for k in gate_questions), default=0.0)
+        return GateResult(probability=best, sections=sections)
+
+    def ask(self, text: str, questions: dict[str, dict]) -> list[Section]:
+        """Stellt nur `questions` auf denselben Abschnitten wie das Gate, ohne Gate-Fragen.
+
+        Für den zweiten Durchlauf der Klassifikation auf dem anonymisierten Text: Dort ist der
+        Gate-Wert ohne Belang, die Abschnitte sollen aber genauso geschnitten sein wie beim Original.
+        """
+        sections = _sections(text, config.GATE_CHUNK_CHARS)
+        for batch in _batches(sections, 16):
             r = self.client.post("/v1/systemone/batch", json={
-                "states": [{"body": c} for c in batch],
+                "states": [{"body": s.body} for s in batch],
                 "questions": questions,
                 "model": config.LAYA_MODEL,
             })
             r.raise_for_status()
-            for res in r.json()["results"]:
-                for k in questions:
-                    best = max(best, float(res["answers"][k]["noul"]))
-        return best
+            for section, res in zip(batch, r.json()["results"]):
+                section.answers = res["answers"]
+        return sections
 
     # ---- Treffer-Bestätigung ------------------------------------------------------------
     def classify(self, text: str, entities: list[Entity]) -> list[Entity]:
@@ -120,20 +166,36 @@ def _context(text: str, e: Entity, window: int = 300) -> str:
     return text[start:end].strip()
 
 
-def _chunk(text: str, size: int) -> list[str]:
-    paras = [p for p in re.split(r"\n\s*\n", text) if p.strip()]
-    chunks, cur = [], ""
-    for p in paras:
-        if len(cur) + len(p) + 2 > size and cur:
-            chunks.append(cur)
-            cur = ""
+def _sections(text: str, size: int) -> list[Section]:
+    """Absätze zu Abschnitten von höchstens `size` Zeichen; überlange Absätze werden geteilt.
+
+    Der Text an Laya sind die Absätze, verbunden mit einer Leerzeile. `start`/`end` reichen
+    vom ersten bis zum letzten Absatz des Abschnitts im Original.
+    """
+    paras, pos = [], 0
+    for m in _PARA_SPLIT.finditer(text):
+        paras.append((pos, m.start()))
+        pos = m.end()
+    paras.append((pos, len(text)))
+    out: list[Section] = []
+    cur: Section | None = None
+    for start, end in paras:
+        p = text[start:end]
+        if not p.strip():
+            continue
+        if cur and len(cur.body) + len(p) + 2 > size:
+            out.append(cur)
+            cur = None
         while len(p) > size:
-            chunks.append(p[:size])
-            p = p[size:]
-        cur = (cur + "\n\n" + p) if cur else p
+            out.append(Section(start, start + size, p[:size]))
+            start, p = start + size, p[size:]
+        if cur:
+            cur.end, cur.body = end, cur.body + "\n\n" + p
+        else:
+            cur = Section(start, end, p)
     if cur:
-        chunks.append(cur)
-    return chunks or [text]
+        out.append(cur)
+    return out or [Section(0, len(text), text)]
 
 
 def _batches(items: list, n: int):

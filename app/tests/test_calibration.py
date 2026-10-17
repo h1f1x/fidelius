@@ -5,7 +5,7 @@ from pathlib import Path
 from fidelius.calibration import Calibration
 from fidelius.pipeline import Pipeline
 
-from .test_pipeline import FakeClock, FakeLaya, read_log
+from .conftest import FakeClock, FakeLaya, read_log
 
 EXAMPLES = Path(__file__).resolve().parents[2] / "examples"
 

@@ -1,38 +1,13 @@
 """Die volle Pipeline mit Fake-Laya und Fake-Detektoren, ohne Modelle."""
-import json
 from concurrent.futures import ThreadPoolExecutor
 
 from fidelius.detectors.base import RawHit
-from fidelius.models import AnalyzeRequest, Entity
+from fidelius.models import AnalyzeRequest
 from fidelius.pipeline import Pipeline
 
+from .conftest import FakeClock, FakeDetector, FakeLaya, read_log
+
 TEXT = "Herr Emre Yilmaz wohnt in Berlin."
-
-
-class FakeLaya:
-    def __init__(self, gate_probability=0.9, reachable=True):
-        self.gate_probability = gate_probability
-        self.reachable = reachable
-        self.classified = False
-
-    def gate(self, text: str) -> float:
-        if not self.reachable:
-            raise ConnectionError("Laya ist weg")
-        return self.gate_probability
-
-    def classify(self, text: str, entities: list[Entity]) -> list[Entity]:
-        self.classified = True
-        return entities
-
-
-class FakeDetector:
-    def __init__(self, *hits: RawHit):
-        self.hits = list(hits)
-        self.called = False
-
-    def __call__(self, text: str) -> list[RawHit]:
-        self.called = True
-        return self.hits
 
 
 def test_harmless_text_skips_detection_and_laya_check():
@@ -80,16 +55,6 @@ def test_unreachable_laya_skips_gate_and_sets_note():
     assert not laya.classified
 
 
-class FakeClock:
-    """Sekunden wie time.perf_counter; die Fakes unten lassen die Zeit vorrücken."""
-
-    def __init__(self):
-        self.now = 100.0
-
-    def __call__(self) -> float:
-        return self.now
-
-
 def test_timing_reports_phase_durations_from_clock():
     # Zweierpotenzen, damit die Sekunden binär exakt sind und kein Rundungsfehler entsteht.
     clock = FakeClock()
@@ -115,10 +80,6 @@ def test_timing_reports_phase_durations_from_clock():
     assert res.timing.detect_ms == 250
     assert res.timing.laya_check_ms == 500
     assert res.timing.total_ms == 875
-
-
-def read_log(path) -> list[dict]:
-    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
 
 
 def test_analyze_writes_one_log_line_with_all_fields(tmp_path):

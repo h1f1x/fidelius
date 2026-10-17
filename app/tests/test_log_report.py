@@ -1,12 +1,11 @@
 """Auswertung des Request-Logs: Lesen, Zeitraum, Kennzahlen. Ohne Modelle, mit fester Uhr."""
 from __future__ import annotations
 
-import json
 from datetime import UTC, datetime
 
 from fidelius.log_report import report
 
-NOW = datetime(2026, 10, 6, 12, 0, tzinfo=UTC)
+from .conftest import NOW, entry, write_log
 
 
 def test_missing_log_reports_path_and_no_entries(tmp_path):
@@ -16,25 +15,6 @@ def test_missing_log_reports_path_and_no_entries(tmp_path):
 
     assert result["log"] == {"path": str(path), "present": False, "lines": 0, "broken": 0}
     assert result["metrics"]["requests"] == 0
-
-
-def entry(time="2026-10-06T10:00:00+00:00", **fields) -> dict:
-    """Eine Logzeile wie aus pipeline._log_entry, harmloser Text ohne Fehler."""
-    line = {
-        "zeit": time,
-        "build": {"version": "0.1.0", "number": 37, "commit": "0d15b11", "dirty": False, "time": None},
-        "quelle": "anfrage", "zeichen": 1000, "gate_wert": 0.1, "schwelle": 0.5,
-        "sensibel": False, "trotzdem": False, "laya_bestaetigung": True,
-        "gate_ms": 100, "erkennung_ms": 0, "laya_ms": 0, "gesamt_ms": 120,
-        "stellen": 0, "platzhalter": 0, "laya_abgelehnt": 0, "fehler": None,
-    }
-    line.update(fields)
-    return line
-
-
-def write_log(path, *lines) -> None:
-    path.write_text("".join((line if isinstance(line, str) else json.dumps(line)) + "\n"
-                            for line in lines), encoding="utf-8")
 
 
 def test_counts_requests_in_period_and_skips_broken_lines(tmp_path):

@@ -45,12 +45,27 @@ fidelius auswerten, wer wann wie viel oder wie gut gearbeitet hat.
 - wie lange die einzelnen Rechenschritte gedauert haben
 - ein Fehlerhinweis, falls ein Teil der Software nicht erreichbar war
 
+Ist die Klassifikation eingeschaltet, kommen hinzu:
+
+- die Schutzstufe des Textes vor und nach dem Ersetzen, etwa „intern“ oder „vertraulich“
+- ob Zugangsdaten wie Passwörter gefunden wurden (ja/nein)
+- ob fidelius vor der Weitergabe gewarnt hat (ja/nein)
+- wie lange die Einschätzung des ersetzten Textes gedauert hat
+
+Die Schutzstufe ist eine Einschätzung durch ein Sprachmodell, kein geprüftes Urteil. Welche Stufen
+es gibt und bis zu welcher Stufe ein Text weitergegeben werden darf, legt die jeweilige
+Installation in einer eigenen Regeldatei fest, nicht fidelius selbst. Auch bei eingeschalteter
+Klassifikation stehen weder Textteile noch die Stellen, an denen eine Stufe erkannt wurde, noch die
+Wahrscheinlichkeiten des Modells im Protokoll.
+
 Nicht darin stehen: der Text, die ersetzten Angaben, die Zuordnung zu den Platzhaltern, eine
 Netzadresse, ein Name oder eine andere Kennung der Person.
 
 Das Protokoll dient dem Betrieb: Es zeigt, wie lange Prüfungen dauern, wie stark fidelius genutzt
 wird und wo Fehler auftreten. Eine Übersichtsseite fasst es zusammen, etwa als Laufzeiten und als
-Zahl der Prüfungen je Tag und je Stunde, immer über alle Nutzenden zusammen.
+Zahl der Prüfungen je Tag und je Stunde, immer über alle Nutzenden zusammen. Bei eingeschalteter
+Klassifikation zeigt sie zusätzlich, wie oft welche Schutzstufe vorkam, wie oft das Ersetzen die
+Stufe gesenkt hat und wie oft gewarnt wurde.
 
 **Technische Meldungen.** Die Software meldet ihren Start, Warnungen und Fehler. Ein Protokoll der
 einzelnen Seitenaufrufe mit Netzadressen schreibt sie nicht. Die Meldungen sind auf 30 MB je Dienst
@@ -128,7 +143,8 @@ soweit nicht anders angegeben.
 | Aussage | Beleg |
 |---|---|
 | Nutzungsprotokoll ohne Text, Treffer und Netzadresse | `app/fidelius/pipeline.py`, `_log_entry`; Felder: `zeit`, `build`, `quelle`, `zeichen`, `gate_wert`, `schwelle`, `sensibel`, `trotzdem`, `laya_bestaetigung`, `gate_ms`, `erkennung_ms`, `laya_ms`, `gesamt_ms`, `stellen`, `platzhalter`, `laya_abgelehnt`, `fehler` |
-| Feldliste festgeschrieben | `app/tests/test_pipeline.py`, Vergleich mit der vollständigen Feldmenge |
+| Zusätzliche Felder nur bei aktiver Klassifikation | `app/fidelius/pipeline.py`, `_classification_fields`: `stufe_original`, `stufe_anonymisiert` (id der Stufe, bei unverändertem Text die des Originals, `null` nur ohne Einschätzung durch Laya), `zugangsdaten`, `gewarnt`, `klassifikation_ms`; Stufen und Freigabe aus `local/klassifikation.yaml` der Installation |
+| Feldliste festgeschrieben | `app/tests/test_pipeline.py`, Vergleich mit der vollständigen Feldmenge; mit Klassifikation `app/tests/test_classification_log.py` |
 | Kein Protokoll der Seitenaufrufe | `app/Dockerfile`: uvicorn mit `--no-access-log` |
 | Technische Meldungen begrenzt | `compose.yaml`: `x-logging`, json-file mit `max-size: 10m`, `max-file: 3` |
 | Tests und versionierter Stand vor jedem Deploy | `scripts/deploy.sh`, `docs/deployen.md` |

@@ -67,6 +67,7 @@
     }
     renderVersion(CONFIG.build);
     renderLimit();
+    $("classInfo").classList.toggle("hidden", !CONFIG.classification);
     initSplash(CONFIG.notice);
     $("threshold").value = CONFIG.gate_threshold; $("thresholdValue").textContent = Number(CONFIG.gate_threshold).toFixed(2);
     try {
@@ -184,7 +185,7 @@
     clearInterval(clock); tick(); clock = setInterval(tick, 100);
     try {
       const res = await api("/api/analyze", { text, gate_threshold: Number($("threshold").value), force, use_laya_check: $("layaCheck").checked });
-      state = { text: res.text, entities: res.entities, mapping: res.mapping, anonymized: res.anonymized_text, gate: res.gate, timing: res.timing, elapsed_ms: Math.round(performance.now() - t0) };
+      state = { text: res.text, entities: res.entities, mapping: res.mapping, anonymized: res.anonymized_text, gate: res.gate, timing: res.timing, elapsed_ms: Math.round(performance.now() - t0), classification: res.classification || null };
       // Fertig ist fertig, auch früher als geschätzt, etwa wenn das Gate den Text als harmlos einstuft.
       bar.value = 100;
       save(); render();
@@ -206,6 +207,7 @@
     try {
       const res = await api("/api/apply", { text: state.text, entities: state.entities });
       state.entities = res.entities; state.mapping = res.mapping; state.anonymized = res.anonymized_text;
+      markClassificationStale();
       save(); render();
     } catch (e) { showError("Die Änderung konnte nicht übernommen werden: " + e.message); }
   }
@@ -225,7 +227,9 @@
   function render() {
     renderGate(); renderResult(); renderMapping(); renderElapsed();
     const t = state.timing;
-    $("timing").textContent = t ? `Einschätzung ${t.gate_ms} ms · Erkennung ${t.detect_ms} ms · Laya-Bestätigung ${t.laya_check_ms} ms · gesamt ${t.total_ms} ms\n${calibrationText(CONFIG.calibration)}` : "";
+    // Die Schutzstufe des Originals steckt in der Einschätzung, die des anonymisierten Texts ist ein eigener Durchlauf.
+    const classMs = t && state.classification ? ` · Schutzstufe anonymisiert ${t.classification_ms} ms` : "";
+    $("timing").textContent = t ? `Einschätzung ${t.gate_ms} ms · Erkennung ${t.detect_ms} ms · Laya-Bestätigung ${t.laya_check_ms} ms${classMs} · gesamt ${t.total_ms} ms\n${calibrationText(CONFIG.calibration)}` : "";
     renderSteps();
   }
   function gateWord(p) {
@@ -267,10 +271,18 @@
   // ---------- Ergebnis: eine Box, zwei Ansichten ----------
   let viewMode = "annot";  // "annot": Original durchgestrichen + Platzhalter; "plain": so wie kopiert
 
-  function tokens(text, ents, mode) {
+  // Klassen und Hinweis für Stellen im auslösenden Abschnitt (classmark.js); leer außerhalb.
+  const TRIG_TITLE = { original: "bestimmt die Schutzstufe des Originals", anonymized: "bestimmt die Schutzstufe des anonymisierten Texts" };
+  const trigAttrs = (kinds) => kinds.length ? { cls: " trig " + kinds.map((k) => "trig-" + k).join(" "), title: "Dieser Abschnitt " + kinds.map((k) => TRIG_TITLE[k]).join(" und ") } : { cls: "", title: "" };
+
+  function tokens(text, ents, mode, ranges = []) {
     // Freie Textstücke tragen ihren Offset im Original, damit sich eine Markierung zurückrechnen lässt.
+    // An den Grenzen eines auslösenden Abschnitts wird ein Stück geteilt; jedes Teil behält seinen Offset.
     let html = "", pos = 0;
-    const plain = (a, b) => a < b ? `<span data-o="${a}">${esc(text.slice(a, b))}</span>` : "";
+    const plain = (a, b) => ClassMark.pieces(a, b, ranges).map((p) => {
+      const t = trigAttrs(p.kinds);
+      return `<span data-o="${p.start}"${t.cls ? ` class="${t.cls.trim()}" title="${t.title}"` : ""}>${esc(text.slice(p.start, p.end))}</span>`;
+    }).join("");
     for (const e of ents) {
       if (e.start < pos) continue;
       html += plain(pos, e.start);
@@ -278,13 +290,13 @@
       const badges = groupSources(e.sources).map((g) => `<b title="${esc(g.title)}">${SOURCE_BADGE[g.name] || "?"}</b>`).join("") + (e.sources.length ? "" : '<b title="manuell markiert">M</b>');
       const laya = e.laya ? `<span class="${e.laya.accepted ? "ok" : "no"}" title="Laya: ${esc(e.laya.category)} ${(e.laya.probability * 100).toFixed(0)}%">L${e.laya.accepted ? "✓" : "✗"}</span>` : "";
       const bd = `<span class="badges expert-only">${badges}${laya}</span>`;
-      const st = `style="--c:${color(e.category)}" data-id="${e.id}"`;
+      const st = `style="--c:${color(e.category)}" data-id="${e.id}"`, tr = trigAttrs(ClassMark.kindsAt(e.start, e.end, ranges)).cls;
       if (rejected) {
-        html += mode === "plain" ? esc(e.text) : `<mark class="ent rejected" ${st} title="${esc(label(e.category))}, bleibt stehen"><s>${esc(e.text)}</s>${bd}</mark>`;
+        html += mode === "plain" ? esc(e.text) : `<mark class="ent rejected${tr}" ${st} title="${esc(label(e.category))}, bleibt stehen"><s>${esc(e.text)}</s>${bd}</mark>`;
       } else if (mode === "plain") {
-        html += `<mark class="ent chip" ${st} title="Original: ${esc(e.text)}">${esc(e.placeholder)}${bd}</mark>`;
+        html += `<mark class="ent chip${tr}" ${st} title="Original: ${esc(e.text)}">${esc(e.placeholder)}${bd}</mark>`;
       } else {
-        html += `<mark class="ent" ${st} title="${esc(label(e.category))}"><s>${esc(e.text)}</s><span class="ph">${esc(e.placeholder)}</span>${bd}</mark>`;
+        html += `<mark class="ent${tr}" ${st} title="${esc(label(e.category))}"><s>${esc(e.text)}</s><span class="ph">${esc(e.placeholder)}</span>${bd}</mark>`;
       }
       pos = e.end;
     }
@@ -297,10 +309,66 @@
     const empty = !text ? '<span class="hint">Hier erscheint der anonymisierte Text.</span>' : "";
     area.innerHTML = `<div class="resulthead"><h2>Anonymisierter Text</h2><div class="seg"><button data-view="annot" class="${viewMode === "annot" ? "on" : ""}">mit Markierungen</button><button data-view="plain" class="${viewMode === "plain" ? "on" : ""}">so wie er kopiert wird</button></div><button id="copyAnon" class="primary">Anonymisierten Text kopieren</button></div>
       <div class="viewnote">${viewMode === "annot" ? "Durchgestrichen = Original, farbig = Platzhalter. Kopiert wird nur der anonymisierte Text, ohne Originale. Klick auf eine Stelle, um sie zu ändern." : "Genau dieser Text landet in der Zwischenablage. Klick auf einen Platzhalter zeigt das Original."}</div>
-      <div class="annotated-text${viewMode === "plain" ? " plain" : ""}">${empty || tokens(text, ents, viewMode)}</div>`;
+      ${classificationHtml()}
+      <div class="annotated-text${viewMode === "plain" ? " plain" : ""}">${empty || tokens(text, ents, viewMode, ClassMark.triggerRanges(CONFIG.classification && state.classification, state.entities))}</div>`;
     area.querySelectorAll(".seg button").forEach((b) => { b.onclick = () => { viewMode = b.dataset.view; renderResult(); }; });
+    // Klick auf eine Stufe im Badge springt zum Abschnitt, der sie bestimmt hat.
+    area.querySelectorAll(".classbadge .lvl[data-jump]").forEach((b) => { b.onclick = () => jumpToTrigger(b.dataset.jump); });
+    const re = $("reclassify"); if (re) re.onclick = reclassify;
   }
 
+
+  // ---------- Schutzstufe ----------
+  // Nur bei aktiver Klassifikation: Dann liefern /api/config die Stufen und /api/analyze die Bewertung.
+  // Bis freigegeben_bis ist eine Stufe neutral, darüber in Warnfarbe.
+  function classificationHtml() {
+    const c = state.classification, rules = CONFIG.classification;
+    if (!c || !rules || !state.text) return "";
+    const banner = ClassMark.bannerHtml(c, rules, markdown);
+    if (!c.original) return `<div class="classbadge"><span class="muted">Schutzstufe: ${esc(c.note || "keine Einschätzung möglich")}</span></div>${banner}`;
+    const name = (id) => (rules.levels.find((l) => l.id === id) || { name: id }).name;
+    const chip = (t, kind) => `<button type="button" class="lvl${ClassMark.overApproval(rules, t.level) ? " over" : ""}" data-jump="${kind}" title="Zum Abschnitt springen, der die Stufe bestimmt">${esc(name(t.level))}</button>`;
+    const badge = c.anonymized ? `Original: ${chip(c.original, "original")} → Anonymisiert: ${chip(c.anonymized, "anonymized")}` : chip(c.original, "original");
+    const note = c.note ? ` <span class="muted">${esc(c.note)}</span>` : "";
+    const stale = c.stale ? ` <span class="stale">veraltet</span> <button id="reclassify" class="small"${reclassifying ? " disabled" : ""}>${reclassifying ? "bewerte …" : "neu bewerten"}</button>` : "";
+    return `<div class="classbadge">Schutzstufe: ${badge}${stale}${note}</div>${banner}${ClassMark.expertHtml(c, rules)}`;
+  }
+  function jumpToTrigger(kind) {
+    const el = $("resultArea").querySelector(".annotated-text .trig-" + kind);
+    if (!el) return;
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    const all = $("resultArea").querySelectorAll(".annotated-text .trig-" + kind);
+    all.forEach((x) => { x.classList.remove("flash"); void x.offsetWidth; x.classList.add("flash"); });
+  }
+
+  // Eine Korrektur ändert den anonymisierten Text, ruft aber kein Modell auf. Die Bewertung bleibt stehen,
+  // gilt aber für den alten Text: Ihre Abschnitte (anonymized.chunk/chunks) passen nicht mehr zu
+  // state.anonymized, bis „neu bewerten“ sie ersetzt. Ohne Bewertung des Originals gibt es nichts zu ersetzen.
+  function markClassificationStale() {
+    const c = state.classification;
+    if (c && c.original && CONFIG.classification) c.stale = true;
+  }
+
+  // Ersetzt nur die Bewertung des anonymisierten Texts; das Original ist von Korrekturen unberührt.
+  // Der Ladezustand steht nicht in state, sonst bliebe der Button nach einem Neuladen gesperrt.
+  let reclassifying = false;
+  async function reclassify() {
+    const c = state.classification, rules = CONFIG.classification, text = state.anonymized;
+    if (!c || !rules) return;
+    reclassifying = true; renderResult();
+    try {
+      const anonymized = await api("/api/classify", { text });
+      // Kam während der Bewertung eine weitere Korrektur, gehört das Ergebnis zu einem alten Text.
+      if (state.classification !== c || state.anonymized !== text) return;
+      Object.assign(c, { anonymized, note: null, stale: false });
+      c.warn = ClassMark.warns(c, rules);
+      showError(null);
+    } catch (e) {
+      showError("Die Schutzstufe konnte nicht neu bewertet werden: " + e.message + ". Die alte Bewertung bleibt als veraltet stehen.");
+    } finally {
+      reclassifying = false; save(); renderResult();
+    }
+  }
 
   function renderMapping() {
     const tb = $("mapping").querySelector("tbody");
